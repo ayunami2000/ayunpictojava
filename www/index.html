@@ -1,0 +1,317 @@
+<html>
+<head>
+
+<title>Pictochat Online</title>
+<script src="howler.min.js"></script>
+<script src="pixi.min.js"></script>
+<link rel="stylesheet" href="nano.min.css"/>
+<script src="pickr.min.js"></script>
+<style>
+/*** iPhone and iOS Form Input Zoom Fixes ***/
+/* Fix Input Zoom on devices older than iPhone 5: */
+@media screen and (device-aspect-ratio: 2/3) {
+    select, textarea, input[type="text"], input[type="password"],
+    input[type="datetime"], input[type="datetime-local"],
+    input[type="date"], input[type="month"], input[type="time"],
+    input[type="week"], input[type="number"], input[type="email"],
+    input[type="url"]{ font-size: 16px; }
+}
+
+/* Fix Input Zoom on iPhone 5, 5C, 5S, iPod Touch 5g */
+@media screen and (device-aspect-ratio: 40/71) {
+    select, textarea, input[type="text"], input[type="password"],
+    input[type="datetime"], input[type="datetime-local"],
+    input[type="date"], input[type="month"], input[type="time"],
+    input[type="week"], input[type="number"], input[type="email"],
+    input[type="url"]{ font-size: 16px; }
+}
+
+/* Fix Input Zoom on iPhone 6, iPhone 6s, iPhone 7  */
+@media screen and (device-aspect-ratio: 375/667) {
+    select, textarea, input[type="text"], input[type="password"],
+    input[type="datetime"], input[type="datetime-local"],
+    input[type="date"], input[type="month"], input[type="time"],
+    input[type="week"], input[type="number"], input[type="email"], 
+    input[type="tel"], input[type="url"]{ font-size: 16px; }
+}
+
+/* Fix Input Zoom on iPhone 6 Plus, iPhone 6s Plus, iPhone 7 Plus, iPhone 8, iPhone X, XS, XS Max  */
+@media screen and (device-aspect-ratio: 9/16) {
+    select, textarea, input[type="text"], input[type="password"],
+    input[type="datetime"], input[type="datetime-local"],
+    input[type="date"], input[type="month"], input[type="time"],
+    input[type="week"], input[type="number"], input[type="email"],
+    input[type="tel"], input[type="url"]{ font-size: 16px; }
+}
+
+@font-face {
+	font-family: "nds";
+	src: url("nds.ttf");
+}
+body {
+	background-image: url('images/body-bg.png');
+	margin: 0;
+	font-size: 16px;
+}
+#root {
+	margin-left: auto;
+	margin-right: auto;
+	border: 1px solid black;
+	box-shadow: 0px 0px 10px black;
+	//position: relative;
+    //top: 50%;
+    //transform: translateY(-50%);
+}
+canvas {
+	position: absolute;
+}
+#intro {
+	position: absolute;
+	z-index: 10;
+	text-align:center;
+}
+#main-settings {
+	transform-origin: top;
+	transform: scale(1);
+}
+#intro_bg {
+	width:100%;
+	position:absolute;
+	z-index: -1;
+	margin-left:-50%;
+}
+#root #intro img {
+	image-rendering: pixelated;
+}
+#logo {
+	display: block;
+	margin-left: auto;
+	margin-right: auto;
+	margin-top: 50px;
+	margin-bottom: 15px;
+	transform-origin: bottom center;
+	cursor: pointer;
+	transform: scale(1);
+}
+input[type=text] {
+	display: inline-block;
+	border: 1px solid black;
+	font-family: nds;
+	font-size: 100%;
+	border-radius: 0;
+	padding-left: 2px;
+	padding-right: 2px;
+	padding-top: 5px;
+	padding-bottom: 5px;
+	width: 93px;
+	font-smooth:never;
+	text-align:center;
+	margin-top: 5px;
+}
+.pickr {
+	margin-top: 5px;
+}
+.pcr-button {
+	width: 93px !important;
+	border: 1px solid black;
+	border-radius: 0 !important;
+	height: 24px !important;
+	margin-bottom: 15px;
+}
+.intro-text {
+	font-family: nds;
+	font-size: 16px;
+	width: 93px;
+	text-align:left;
+	margin-left: auto;
+	margin-right: auto;
+	margin-top: 10px;
+	font-smooth:never;
+}
+#other_settings {
+	cursor: pointer;
+}
+#settings {
+	font-family: nds;
+	font-size: 16px;
+	position: absolute;
+	z-index: 10;
+	text-align:left;
+	display: none;
+	vertical-align: middle;
+}
+#settings-container {
+	width: 200px;
+	height: 300px;
+	margin: auto;
+	margin-top: 40px;
+	background-color: #fff;
+	border: 1px solid black;
+	padding: 10px;
+	transform-origin: top;
+	transform: scale(1);
+}
+#settings-done {
+	cursor: pointer;
+	position: relative;
+	bottom: -220px;
+	width: 90px;
+	margin-left: auto;
+	margin-right: auto;
+}
+</style>
+
+</head>
+<body>
+
+<div id="root">
+	<div id="intro">
+		<img src="images/intro_bg.png" id="intro_bg"></img>
+		<div id="main-settings">
+		<img src="images/logo.png" id="logo" onclick="requestVerification()"></img>
+		<div class="intro-text">Username:</div>
+		<input type="text" id="name_box" spellcheck="false" maxlength="10" onkeyup="fixUserbox(this)"></input>
+		<div class="intro-text">Color:</div>
+		<div class="colorpicker"></div>
+		<img src="images/other_settings.png" id="other_settings" onclick="otherSettings()"></img>
+		</div>
+	</div>
+	<div id="settings">
+		<div id="settings-container">
+			<div style="margin-bottom: 5px; border-bottom: 1px solid black; padding: 5px; text-align: center;">Other Settings</div>
+			<label for="int-scaling"><input type="checkbox" id="int-scaling" onchange="intScaling(true)"></input> Integer Scaling</label>
+			<div id="settings-done"><img src="images/done.png" onclick="closeOtherSettings()"></img></div>
+		</div>
+	</div>
+</div>
+
+<script src="main.js"></script>
+<script>
+const swatches = [
+	'#61829a',
+	'#ba4900',
+	'#fb0018',
+	'#fb8afb',
+	'#fb9200',
+	'#f3e300',
+	'#aafb00',
+	'#00fb00',
+	'#00a238',
+	'#49db8a',
+	'#30baf3',
+	'#0059f3',
+	'#000092',
+	'#8a00d3',
+	'#d300eb',
+	'#fb0092'
+];
+var defaultColor = swatches[Math.floor(Math.random() * swatches.length)];
+if(localStorage.getItem("color") == null) {
+	localStorage.setItem("color", defaultColor);
+} else {
+	defaultColor = localStorage.getItem("color");
+}
+const pickr = Pickr.create({
+	el: '.colorpicker',
+	theme: 'nano',
+	swatches: swatches,
+	default: defaultColor,
+	comparison: false,
+	components: {
+		preview: true,
+		opacity: false,
+		hue: true,
+		interaction: {
+			input: true,
+			hex: true,
+			rgba: true
+		}
+	}
+});
+
+if(localStorage.getItem("username") == null) {
+	localStorage.setItem("username", "user" + (Math.floor(Math.random() * 1000000)));
+}
+if(localStorage.getItem("intScaling") == null) {
+	localStorage.setItem("intScaling", false);
+}
+
+document.getElementById("int-scaling").checked = (localStorage.getItem("intScaling") == "true");
+intScaling(false);
+
+document.getElementById("name_box").value = localStorage.getItem("username");
+
+function fixUserbox(object) {
+	var desired = object.value.replace(/[^\w\s]/gi, '');
+	object.value = desired;
+}
+
+function requestVerification() {
+	var color = pickr.getColor().toHEXA().toString().replace("#", "0x");
+	playerData.name = document.getElementById("name_box").value;
+	var desired = playerData.name.replace(/[^\w\s]/gi, '');
+	playerData.name = desired;
+	playerData.color = parseInt(color, 16);
+	var obj = { type: 'cl_verifyName', player: playerData };
+	websocket.send(JSON.stringify(obj));
+}
+
+function start() {
+	sounds.start_app.play();
+	updatePlayerData();
+	document.getElementById("intro").style.opacity = 1.5;
+	var margin = 50 * SCALE;
+	var marginBottom = 15;
+	var interval = setInterval(function() {
+		margin -= 7;
+		marginBottom += 7 / SCALE;
+		document.getElementById("logo").style.marginTop = margin;
+		document.getElementById("logo").style.marginBottom = marginBottom;
+		document.getElementById("intro").style.opacity -= 0.02;
+		if(document.getElementById("intro").style.opacity <= 0) {
+			clearInterval(interval);
+			document.getElementById("intro").style.display = "none";
+		}
+	}, 1000/60);
+}
+
+function otherSettings() {
+	document.getElementById("settings").style.opacity = 0;
+	document.getElementById("settings").style.display = "block";
+	var interval = setInterval(function() {
+		document.getElementById("settings").style.opacity = parseFloat(document.getElementById("settings").style.opacity) + 0.05;
+		if(document.getElementById("settings").style.opacity >= 1) {
+			clearInterval(interval);
+			document.getElementById("settings").style.opacity = 1;
+		}
+	}, 1000/60);
+}
+
+function closeOtherSettings() {
+	document.getElementById("settings").style.opacity = 1;
+	var interval = setInterval(function() {
+		document.getElementById("settings").style.opacity = parseFloat(document.getElementById("settings").style.opacity) - 0.05;
+		if(document.getElementById("settings").style.opacity <= 0) {
+			clearInterval(interval);
+			document.getElementById("settings").style.opacity = 0;
+			document.getElementById("settings").style.display = "none";
+		}
+	}, 1000/60);
+}
+
+function intScaling(set) {
+	if(set)
+		localStorage.setItem("intScaling", document.getElementById("int-scaling").checked);
+	var height = (window.innerHeight - 2) / 384;
+	var width = (window.innerWidth - 2) / 256;
+	SCALE = width > height ? height : width;
+	scaleStage();
+	if(localStorage.getItem("intScaling") == "true") {
+		SCALE = Math.floor(SCALE);
+		scaleStage();
+	}
+}
+</script>
+
+</body>
+</html>

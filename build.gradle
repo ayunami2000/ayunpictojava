@@ -1,0 +1,15 @@
+plugins {
+    id 'java'
+}
+
+group 'me.ayunami2000.ayunpictojava'
+version '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'io.netty:netty-codec-http:4.1.92.Final'
+    implementation 'com.google.code.gson:gson:2.10.1'
+}
