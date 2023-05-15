@@ -13,3 +13,14 @@ dependencies {
     implementation 'io.netty:netty-codec-http:4.1.92.Final'
     implementation 'com.google.code.gson:gson:2.10.1'
 }
+
+jar {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    manifest {
+        attributes "Main-Class": "me.ayunami2000.ayunpictojava.Main"
+    }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
