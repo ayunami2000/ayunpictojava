@@ -99,257 +99,263 @@ import static io.netty.handler.codec.http.HttpVersion.*;
  */
 public class HttpStaticFileServerHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 
-    public static final String HTTP_DATE_FORMAT = "EEE, dd MMM yyyy HH:mm:ss zzz";
-    public static final String HTTP_DATE_GMT_TIMEZONE = "GMT";
-    public static final int HTTP_CACHE_SECONDS = 60;
+	public static final String HTTP_DATE_FORMAT = "EEE, dd MMM yyyy HH:mm:ss zzz";
+	public static final String HTTP_DATE_GMT_TIMEZONE = "GMT";
+	public static final int HTTP_CACHE_SECONDS = 60;
 
-    private FullHttpRequest request;
+	private FullHttpRequest request;
 
-    @Override
-    public void channelRead0(ChannelHandlerContext ctx, FullHttpRequest request) throws Exception {
-        this.request = request;
-        if (!request.decoderResult().isSuccess()) {
-            sendError(ctx, BAD_REQUEST);
-            return;
-        }
+	private final String dir;
 
-        if (!GET.equals(request.method())) {
-            sendError(ctx, METHOD_NOT_ALLOWED);
-            return;
-        }
+	public HttpStaticFileServerHandler(String dir) {
+		this.dir = dir;
+	}
 
-        final boolean keepAlive = HttpUtil.isKeepAlive(request);
-        final String uri = request.uri();
-        final String path = sanitizeUri(uri);
-        if (path == null) {
-            sendError(ctx, FORBIDDEN);
-            return;
-        }
+	@Override
+	public void channelRead0(ChannelHandlerContext ctx, FullHttpRequest request) throws Exception {
+		this.request = request;
+		if (!request.decoderResult().isSuccess()) {
+			sendError(ctx, BAD_REQUEST);
+			return;
+		}
 
-        File file = new File(path);
-        if (file.isHidden() || !file.exists()) {
-            sendError(ctx, NOT_FOUND);
-            return;
-        }
+		if (!GET.equals(request.method())) {
+			sendError(ctx, METHOD_NOT_ALLOWED);
+			return;
+		}
 
-        if (file.isDirectory()) {
-            if (uri.endsWith("/")) {
-                file = new File(path, "index.html");
-            } else {
-                sendRedirect(ctx, uri + '/');
-                return;
-            }
-        }
+		final boolean keepAlive = HttpUtil.isKeepAlive(request);
+		final String uri = request.uri();
+		final String path = sanitizeUri(uri);
+		if (path == null) {
+			sendError(ctx, FORBIDDEN);
+			return;
+		}
 
-        if (!file.isFile()) {
-            sendError(ctx, FORBIDDEN);
-            return;
-        }
+		File file = new File(path);
+		if (file.isHidden() || !file.exists()) {
+			sendError(ctx, NOT_FOUND);
+			return;
+		}
 
-        // Cache Validation
-        String ifModifiedSince = request.headers().get(HttpHeaderNames.IF_MODIFIED_SINCE);
-        if (ifModifiedSince != null && !ifModifiedSince.isEmpty()) {
-            SimpleDateFormat dateFormatter = new SimpleDateFormat(HTTP_DATE_FORMAT, Locale.US);
-            Date ifModifiedSinceDate = dateFormatter.parse(ifModifiedSince);
+		if (file.isDirectory()) {
+			if (uri.endsWith("/")) {
+				file = new File(path, "index.html");
+			} else {
+				sendRedirect(ctx, uri + '/');
+				return;
+			}
+		}
 
-            // Only compare up to the second because the datetime format we send to the client
-            // does not have milliseconds
-            long ifModifiedSinceDateSeconds = ifModifiedSinceDate.getTime() / 1000;
-            long fileLastModifiedSeconds = file.lastModified() / 1000;
-            if (ifModifiedSinceDateSeconds == fileLastModifiedSeconds) {
-                sendNotModified(ctx);
-                return;
-            }
-        }
+		if (!file.isFile()) {
+			sendError(ctx, FORBIDDEN);
+			return;
+		}
 
-        RandomAccessFile raf;
-        try {
-            raf = new RandomAccessFile(file, "r");
-        } catch (FileNotFoundException ignore) {
-            sendError(ctx, NOT_FOUND);
-            return;
-        }
-        long fileLength = raf.length();
+		// Cache Validation
+		String ifModifiedSince = request.headers().get(HttpHeaderNames.IF_MODIFIED_SINCE);
+		if (ifModifiedSince != null && !ifModifiedSince.isEmpty()) {
+			SimpleDateFormat dateFormatter = new SimpleDateFormat(HTTP_DATE_FORMAT, Locale.US);
+			Date ifModifiedSinceDate = dateFormatter.parse(ifModifiedSince);
 
-        HttpResponse response = new DefaultHttpResponse(HTTP_1_1, OK);
-        HttpUtil.setContentLength(response, fileLength);
-        setContentTypeHeader(response, file);
-        setDateAndCacheHeaders(response, file);
+			// Only compare up to the second because the datetime format we send to the client
+			// does not have milliseconds
+			long ifModifiedSinceDateSeconds = ifModifiedSinceDate.getTime() / 1000;
+			long fileLastModifiedSeconds = file.lastModified() / 1000;
+			if (ifModifiedSinceDateSeconds == fileLastModifiedSeconds) {
+				sendNotModified(ctx);
+				return;
+			}
+		}
 
-        if (!keepAlive) {
-            response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-        } else if (request.protocolVersion().equals(HTTP_1_0)) {
-            response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
-        }
+		RandomAccessFile raf;
+		try {
+			raf = new RandomAccessFile(file, "r");
+		} catch (FileNotFoundException ignore) {
+			sendError(ctx, NOT_FOUND);
+			return;
+		}
+		long fileLength = raf.length();
 
-        // Write the initial line and the header.
-        ctx.write(response);
+		HttpResponse response = new DefaultHttpResponse(HTTP_1_1, OK);
+		HttpUtil.setContentLength(response, fileLength);
+		setContentTypeHeader(response, file);
+		setDateAndCacheHeaders(response, file);
 
-        // Write the content.
-        ChannelFuture sendFileFuture;
-        ChannelFuture lastContentFuture;
-        if (ctx.pipeline().get(SslHandler.class) == null) {
-            sendFileFuture =
-                    ctx.write(new DefaultFileRegion(raf.getChannel(), 0, fileLength), ctx.newProgressivePromise());
-            // Write the end marker.
-            lastContentFuture = ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
-        } else {
-            sendFileFuture =
-                    ctx.writeAndFlush(new HttpChunkedInput(new ChunkedFile(raf, 0, fileLength, 8192)),
-                            ctx.newProgressivePromise());
-            // HttpChunkedInput will write the end marker (LastHttpContent) for us.
-            lastContentFuture = sendFileFuture;
-        }
+		if (!keepAlive) {
+			response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+		} else if (request.protocolVersion().equals(HTTP_1_0)) {
+			response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+		}
 
-        // Decide whether to close the connection or not.
-        if (!keepAlive) {
-            // Close the connection when the whole content is written out.
-            lastContentFuture.addListener(ChannelFutureListener.CLOSE);
-        }
-    }
+		// Write the initial line and the header.
+		ctx.write(response);
 
-    @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        cause.printStackTrace();
-        if (ctx.channel().isActive()) {
-            sendError(ctx, INTERNAL_SERVER_ERROR);
-        }
-    }
+		// Write the content.
+		ChannelFuture sendFileFuture;
+		ChannelFuture lastContentFuture;
+		if (ctx.pipeline().get(SslHandler.class) == null) {
+			sendFileFuture =
+					ctx.write(new DefaultFileRegion(raf.getChannel(), 0, fileLength), ctx.newProgressivePromise());
+			// Write the end marker.
+			lastContentFuture = ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
+		} else {
+			sendFileFuture =
+					ctx.writeAndFlush(new HttpChunkedInput(new ChunkedFile(raf, 0, fileLength, 8192)),
+							ctx.newProgressivePromise());
+			// HttpChunkedInput will write the end marker (LastHttpContent) for us.
+			lastContentFuture = sendFileFuture;
+		}
 
-    private static final Pattern INSECURE_URI = Pattern.compile(".*[<>&\"].*");
+		// Decide whether to close the connection or not.
+		if (!keepAlive) {
+			// Close the connection when the whole content is written out.
+			lastContentFuture.addListener(ChannelFutureListener.CLOSE);
+		}
+	}
 
-    private static String sanitizeUri(String uri) {
-        // Decode the path.
-        try {
-            uri = URLDecoder.decode(uri, "UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            throw new Error(e);
-        }
+	@Override
+	public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+		cause.printStackTrace();
+		if (ctx.channel().isActive()) {
+			sendError(ctx, INTERNAL_SERVER_ERROR);
+		}
+	}
 
-        if (uri.isEmpty() || uri.charAt(0) != '/') {
-            return null;
-        }
+	private static final Pattern INSECURE_URI = Pattern.compile(".*[<>&\"].*");
 
-        // Convert file separators.
-        uri = uri.replace('/', File.separatorChar);
+	private String sanitizeUri(String uri) {
+		// Decode the path.
+		try {
+			uri = URLDecoder.decode(uri, "UTF-8");
+		} catch (UnsupportedEncodingException e) {
+			throw new Error(e);
+		}
 
-        // Simplistic dumb security check.
-        // You will have to do something serious in the production environment.
-        if (uri.contains(File.separator + '.') ||
-                uri.contains('.' + File.separator) ||
-                uri.charAt(0) == '.' || uri.charAt(uri.length() - 1) == '.' ||
-                INSECURE_URI.matcher(uri).matches()) {
-            return null;
-        }
+		if (uri.isEmpty() || uri.charAt(0) != '/') {
+			return null;
+		}
 
-        // Convert to absolute path.
-        return "www" + File.separator + uri;
-    }
+		// Convert file separators.
+		uri = uri.replace('/', File.separatorChar);
 
-    private void sendRedirect(ChannelHandlerContext ctx, String newUri) {
-        FullHttpResponse response = new DefaultFullHttpResponse(HTTP_1_1, FOUND, Unpooled.EMPTY_BUFFER);
-        response.headers().set(HttpHeaderNames.LOCATION, newUri);
+		// Simplistic dumb security check.
+		// You will have to do something serious in the production environment.
+		if (uri.contains(File.separator + '.') ||
+				uri.contains('.' + File.separator) ||
+				uri.charAt(0) == '.' || uri.charAt(uri.length() - 1) == '.' ||
+				INSECURE_URI.matcher(uri).matches()) {
+			return null;
+		}
 
-        sendAndCleanupConnection(ctx, response);
-    }
+		// Convert to absolute path.
+		return dir + File.separator + uri;
+	}
 
-    private void sendError(ChannelHandlerContext ctx, HttpResponseStatus status) {
-        FullHttpResponse response = new DefaultFullHttpResponse(
-                HTTP_1_1, status, Unpooled.copiedBuffer("Failure: " + status + "\r\n", CharsetUtil.UTF_8));
-        response.headers().set(HttpHeaderNames.CONTENT_TYPE, "text/plain; charset=UTF-8");
+	private void sendRedirect(ChannelHandlerContext ctx, String newUri) {
+		FullHttpResponse response = new DefaultFullHttpResponse(HTTP_1_1, FOUND, Unpooled.EMPTY_BUFFER);
+		response.headers().set(HttpHeaderNames.LOCATION, newUri);
 
-        sendAndCleanupConnection(ctx, response);
-    }
+		sendAndCleanupConnection(ctx, response);
+	}
 
-    /**
-     * When file timestamp is the same as what the browser is sending up, send a "304 Not Modified"
-     *
-     * @param ctx
-     *            Context
-     */
-    private void sendNotModified(ChannelHandlerContext ctx) {
-        FullHttpResponse response = new DefaultFullHttpResponse(HTTP_1_1, NOT_MODIFIED, Unpooled.EMPTY_BUFFER);
-        setDateHeader(response);
+	private void sendError(ChannelHandlerContext ctx, HttpResponseStatus status) {
+		FullHttpResponse response = new DefaultFullHttpResponse(
+				HTTP_1_1, status, Unpooled.copiedBuffer("Failure: " + status + "\r\n", CharsetUtil.UTF_8));
+		response.headers().set(HttpHeaderNames.CONTENT_TYPE, "text/plain; charset=UTF-8");
 
-        sendAndCleanupConnection(ctx, response);
-    }
+		sendAndCleanupConnection(ctx, response);
+	}
 
-    /**
-     * If Keep-Alive is disabled, attaches "Connection: close" header to the response
-     * and closes the connection after the response being sent.
-     */
-    private void sendAndCleanupConnection(ChannelHandlerContext ctx, FullHttpResponse response) {
-        final FullHttpRequest request = this.request;
-        final boolean keepAlive = HttpUtil.isKeepAlive(request);
-        HttpUtil.setContentLength(response, response.content().readableBytes());
-        if (!keepAlive) {
-            // We're going to close the connection as soon as the response is sent,
-            // so we should also make it clear for the client.
-            response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-        } else if (request.protocolVersion().equals(HTTP_1_0)) {
-            response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
-        }
+	/**
+	 * When file timestamp is the same as what the browser is sending up, send a "304 Not Modified"
+	 *
+	 * @param ctx
+	 *            Context
+	 */
+	private void sendNotModified(ChannelHandlerContext ctx) {
+		FullHttpResponse response = new DefaultFullHttpResponse(HTTP_1_1, NOT_MODIFIED, Unpooled.EMPTY_BUFFER);
+		setDateHeader(response);
 
-        ChannelFuture flushPromise = ctx.writeAndFlush(response);
+		sendAndCleanupConnection(ctx, response);
+	}
 
-        if (!keepAlive) {
-            // Close the connection as soon as the response is sent.
-            flushPromise.addListener(ChannelFutureListener.CLOSE);
-        }
-    }
+	/**
+	 * If Keep-Alive is disabled, attaches "Connection: close" header to the response
+	 * and closes the connection after the response being sent.
+	 */
+	private void sendAndCleanupConnection(ChannelHandlerContext ctx, FullHttpResponse response) {
+		final FullHttpRequest request = this.request;
+		final boolean keepAlive = HttpUtil.isKeepAlive(request);
+		HttpUtil.setContentLength(response, response.content().readableBytes());
+		if (!keepAlive) {
+			// We're going to close the connection as soon as the response is sent,
+			// so we should also make it clear for the client.
+			response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+		} else if (request.protocolVersion().equals(HTTP_1_0)) {
+			response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+		}
 
-    /**
-     * Sets the Date header for the HTTP response
-     *
-     * @param response
-     *            HTTP response
-     */
-    private static void setDateHeader(FullHttpResponse response) {
-        SimpleDateFormat dateFormatter = new SimpleDateFormat(HTTP_DATE_FORMAT, Locale.US);
-        dateFormatter.setTimeZone(TimeZone.getTimeZone(HTTP_DATE_GMT_TIMEZONE));
+		ChannelFuture flushPromise = ctx.writeAndFlush(response);
 
-        Calendar time = new GregorianCalendar();
-        response.headers().set(HttpHeaderNames.DATE, dateFormatter.format(time.getTime()));
-    }
+		if (!keepAlive) {
+			// Close the connection as soon as the response is sent.
+			flushPromise.addListener(ChannelFutureListener.CLOSE);
+		}
+	}
 
-    /**
-     * Sets the Date and Cache headers for the HTTP Response
-     *
-     * @param response
-     *            HTTP response
-     * @param fileToCache
-     *            file to extract content type
-     */
-    private static void setDateAndCacheHeaders(HttpResponse response, File fileToCache) {
-        SimpleDateFormat dateFormatter = new SimpleDateFormat(HTTP_DATE_FORMAT, Locale.US);
-        dateFormatter.setTimeZone(TimeZone.getTimeZone(HTTP_DATE_GMT_TIMEZONE));
+	/**
+	 * Sets the Date header for the HTTP response
+	 *
+	 * @param response
+	 *            HTTP response
+	 */
+	private static void setDateHeader(FullHttpResponse response) {
+		SimpleDateFormat dateFormatter = new SimpleDateFormat(HTTP_DATE_FORMAT, Locale.US);
+		dateFormatter.setTimeZone(TimeZone.getTimeZone(HTTP_DATE_GMT_TIMEZONE));
 
-        // Date header
-        Calendar time = new GregorianCalendar();
-        response.headers().set(HttpHeaderNames.DATE, dateFormatter.format(time.getTime()));
+		Calendar time = new GregorianCalendar();
+		response.headers().set(HttpHeaderNames.DATE, dateFormatter.format(time.getTime()));
+	}
 
-        // Add cache headers
-        time.add(Calendar.SECOND, HTTP_CACHE_SECONDS);
-        response.headers().set(HttpHeaderNames.EXPIRES, dateFormatter.format(time.getTime()));
-        response.headers().set(HttpHeaderNames.CACHE_CONTROL, "private, max-age=" + HTTP_CACHE_SECONDS);
-        response.headers().set(
-                HttpHeaderNames.LAST_MODIFIED, dateFormatter.format(new Date(fileToCache.lastModified())));
-    }
+	/**
+	 * Sets the Date and Cache headers for the HTTP Response
+	 *
+	 * @param response
+	 *            HTTP response
+	 * @param fileToCache
+	 *            file to extract content type
+	 */
+	private static void setDateAndCacheHeaders(HttpResponse response, File fileToCache) {
+		SimpleDateFormat dateFormatter = new SimpleDateFormat(HTTP_DATE_FORMAT, Locale.US);
+		dateFormatter.setTimeZone(TimeZone.getTimeZone(HTTP_DATE_GMT_TIMEZONE));
 
-    /**
-     * Sets the content type header for the HTTP Response
-     *
-     * @param response
-     *            HTTP response
-     * @param file
-     *            file to extract content type
-     */
-    private static void setContentTypeHeader(HttpResponse response, File file) {
-        String mimeType = null;
-        try {
-            mimeType = Files.probeContentType(file.toPath());
-        } catch (IOException ignored) {}
-        if (mimeType == null) mimeType = "application/octet-stream";
-        response.headers().set(HttpHeaderNames.CONTENT_TYPE, mimeType);
-    }
+		// Date header
+		Calendar time = new GregorianCalendar();
+		response.headers().set(HttpHeaderNames.DATE, dateFormatter.format(time.getTime()));
+
+		// Add cache headers
+		time.add(Calendar.SECOND, HTTP_CACHE_SECONDS);
+		response.headers().set(HttpHeaderNames.EXPIRES, dateFormatter.format(time.getTime()));
+		response.headers().set(HttpHeaderNames.CACHE_CONTROL, "private, max-age=" + HTTP_CACHE_SECONDS);
+		response.headers().set(
+				HttpHeaderNames.LAST_MODIFIED, dateFormatter.format(new Date(fileToCache.lastModified())));
+	}
+
+	/**
+	 * Sets the content type header for the HTTP Response
+	 *
+	 * @param response
+	 *            HTTP response
+	 * @param file
+	 *            file to extract content type
+	 */
+	private static void setContentTypeHeader(HttpResponse response, File file) {
+		String mimeType = null;
+		try {
+			mimeType = Files.probeContentType(file.toPath());
+		} catch (IOException ignored) {}
+		if (mimeType == null) mimeType = "application/octet-stream";
+		response.headers().set(HttpHeaderNames.CONTENT_TYPE, mimeType);
+	}
 }
