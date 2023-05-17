@@ -482,12 +482,23 @@ public class Main {
                     for (JsonElement textbox : textboxes) {
                         if (!textbox.isJsonObject()) continue;
                         JsonObject textboxObject = (JsonObject) textbox;
-                        if (textboxObject.has("text")) {
+                        if (textboxObject.has("text") && textboxObject.has("x") && textboxObject.has("y")) {
                             String text = textboxObject.remove("text").getAsString();
                             if (text.length() > 40) text = text.substring(0, 40);
-                            textRawBuilder.append("\n").append(text);
+                            double x = textboxObject.get("x").getAsDouble();
+                            double y = textboxObject.get("y").getAsDouble();
+                            boolean duplicate = false;
+                            for (JsonElement jsonElement : textboxesOut) {
+                                JsonObject jsonObject1 = jsonElement.getAsJsonObject();
+                                if (jsonObject1.get("x").getAsDouble() == x && jsonObject1.get("y").getAsDouble() == y && jsonObject1.get("text").getAsString().equals(text)) {
+                                    duplicate = true;
+                                    break;
+                                }
+                            }
+                            if (duplicate) continue;
                             textboxObject.addProperty("text", text);
                             textboxesOut.add(textboxObject);
+                            textRawBuilder.append("\n").append(text);
                             if (textboxesOut.size() >= 50) break;
                         }
                     }
