@@ -92,7 +92,7 @@ public class Main {
         if (settingsJson.has("port")) port = settingsJson.get("port").getAsInt();
         String host = "127.0.0.1";
         if (settingsJson.has("host")) host = settingsJson.get("host").getAsString();
-        String web = "www";
+        String web;
         if (settingsJson.has("web")) {
             web = settingsJson.get("web").getAsString();
             File webFile = new File(web);
@@ -199,7 +199,6 @@ public class Main {
         EventLoopGroup workerGroup = new NioEventLoopGroup();
         try {
             ServerBootstrap b = new ServerBootstrap();
-            String finalWeb = web;
             b.group(bossGroup, workerGroup)
                     .channel(NioServerSocketChannel.class)
                     .childHandler(new ChannelInitializer<Channel>() {
@@ -218,14 +217,14 @@ public class Main {
                                         remoteAddressField.setAccessible(true);
                                         remoteAddressField.set(ctx.channel(), new InetSocketAddress(ip, 0));
                                     }
-                                    if (finalWeb == null || (request.headers().contains(HttpHeaderNames.CONNECTION) && request.headers().get(HttpHeaderNames.CONNECTION).toLowerCase().contains("upgrade") && request.headers().contains(HttpHeaderNames.UPGRADE) && request.headers().get(HttpHeaderNames.UPGRADE).toLowerCase().contains("websocket"))) {
+                                    if (web == null || (request.headers().contains(HttpHeaderNames.CONNECTION) && request.headers().get(HttpHeaderNames.CONNECTION).toLowerCase().contains("upgrade") && request.headers().contains(HttpHeaderNames.UPGRADE) && request.headers().get(HttpHeaderNames.UPGRADE).toLowerCase().contains("websocket"))) {
                                         pipeline.addLast("websocket-server-compression-handler", new WebSocketServerCompressionHandler());
                                         pipeline.addLast("websocket-server-protocol-handler", new WebSocketServerProtocolHandler("/", null, true, 65536));
                                         pipeline.addLast("websocket-frametojson", new WebSocketFrameToJsonObjectDecoder());
                                         pipeline.addLast("websocket-jsontoframe", new JsonObjectToWebSocketFrameEncoder());
                                         pipeline.addLast("server-handler", new ServerHandler());
                                     } else {
-                                        pipeline.addLast(new HttpStaticFileServerHandler(finalWeb));
+                                        pipeline.addLast(new HttpStaticFileServerHandler(web));
                                     }
                                     if (request instanceof FullHttpRequest) ((FullHttpRequest) request).retain();
                                     pipeline.fireChannelRead(request);
