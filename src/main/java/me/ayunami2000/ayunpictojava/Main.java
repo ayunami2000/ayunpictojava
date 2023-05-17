@@ -558,6 +558,7 @@ public class Main {
                                 g2d.drawString(player.get("name").getAsString(), 6, 16);
                                 g2d.setColor(fgColor);
                                 GeneralPath polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
+                                polyline.moveTo(0, 0);
                                 for (JsonElement jsonElement : drawing) {
                                     JsonObject drawingObj = jsonElement.getAsJsonObject();
                                     if (!drawingObj.has("type")) continue;
