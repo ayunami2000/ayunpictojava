@@ -112,7 +112,8 @@ public class Main {
         if (settingsJson.has("discord")) {
             JsonObject discordJson = settingsJson.getAsJsonObject("discord");
             if (discordJson.has("enabled") && discordJson.get("enabled").getAsBoolean() && discordJson.has("token") && discordJson.has("channels")) {
-                String token = discordJson.get("token").getAsString();
+                String token = System.getenv("PICTOJAVA_TOKEN");
+                if (token == null || token.isEmpty()) token = discordJson.get("token").getAsString();
                 JsonArray channels = discordJson.getAsJsonArray("channels");
                 if (channels.size() > 0) {
                     channel1 = channels.get(0).getAsString();
