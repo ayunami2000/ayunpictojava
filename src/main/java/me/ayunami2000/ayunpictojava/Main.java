@@ -212,7 +212,7 @@ public class Main {
                                 @Override
                                 protected void channelRead0(ChannelHandlerContext ctx, HttpRequest request) throws NoSuchFieldException, IllegalAccessException {
                                     pipeline.remove("http-websocket-detector");
-                                    String ip = request.headers().get("X-FORWARDED-FOR");
+                                    String ip = request.headers().get("X-FORWARDED-FOR").split(",", 2)[0];
                                     if (ip != null) {
                                         Field remoteAddressField = AbstractChannel.class.getDeclaredField("remoteAddress");
                                         remoteAddressField.setAccessible(true);
