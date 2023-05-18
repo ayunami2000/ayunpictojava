@@ -651,20 +651,24 @@ app.loader.load((loader, resources) => {
 			var direction = (targetY - pc_sprites.scrollContainer.y) > 0 ? 1 : -1;
 			var interval = setInterval(function() {
 				pc_sprites.scrollContainer.y += 4 * SCALE * direction * speed;
+				pc_sprites.scrollContainer.origy = pc_sprites.scrollContainer.y / SCALE;
 				if(direction == 1) {
 					if(pc_sprites.scrollContainer.y >= targetY) {
 						clearInterval(interval);
 						pc_sprites.scrollContainer.y = targetY;
+						pc_sprites.scrollContainer.origy = pc_sprites.scrollContainer.y / SCALE;
 					}
 				} else {
 					if(pc_sprites.scrollContainer.y <= targetY) {
 						clearInterval(interval);
 						pc_sprites.scrollContainer.y = targetY;
+						pc_sprites.scrollContainer.origy = pc_sprites.scrollContainer.y / SCALE;
 					}
 				}
 			}, 1000/60);
 		} else {
 			pc_sprites.scrollContainer.y = targetY;
+			pc_sprites.scrollContainer.origy = pc_sprites.scrollContainer.y / SCALE;
 		}
 	}
 
