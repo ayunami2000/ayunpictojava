@@ -22,6 +22,8 @@ import net.dv8tion.jda.api.exceptions.InvalidTokenException;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.api.utils.FileUpload;
+import org.asynchttpclient.AsyncHttpClient;
+import org.asynchttpclient.Dsl;
 import org.jetbrains.annotations.NotNull;
 
 import javax.imageio.ImageIO;
@@ -44,7 +46,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Main {
+    private static final Gson gson = new Gson();
     private static JDA jda = null;
+    private static String secret = System.getenv("PICTOJAVA_SECRET");
     private static String channel1 = null;
     private static String channel2 = null;
     private static String channel3 = null;
@@ -210,7 +214,6 @@ public class Main {
     static {
         if (BANFILE.exists()) {
             if (BANFILE.isDirectory()) System.exit(1);
-            Gson gson = new Gson();
             try (FileReader reader = new FileReader(BANFILE)) {
                 banList = gson.fromJson(reader, JsonArray.class);
             } catch (IOException e) {
@@ -228,7 +231,6 @@ public class Main {
     }
 
     private static void banIP(InetAddress ip, boolean unban) {
-        Gson gson = new Gson();
         if (unban) {
             for (int i = 0; i < banList.size(); i++)
                 if (banList.get(i).getAsString().equals(ip.getHostAddress())) banList.set(i, new JsonPrimitive(0));
@@ -252,12 +254,13 @@ public class Main {
         if (!settingsFile.exists())
             Files.copy(Objects.requireNonNull(Main.class.getResourceAsStream("/settings.json")), Paths.get("settings.json"), StandardCopyOption.REPLACE_EXISTING);
         Reader reader = Files.newBufferedReader(settingsFile.toPath());
-        JsonObject settingsJson = new Gson().fromJson(reader, JsonObject.class);
+        JsonObject settingsJson = gson.fromJson(reader, JsonObject.class);
         reader.close();
         int port = 8080;
         if (settingsJson.has("port")) port = settingsJson.get("port").getAsInt();
         String host = "127.0.0.1";
         if (settingsJson.has("host")) host = settingsJson.get("host").getAsString();
+        if ((secret == null || secret.isEmpty()) && settingsJson.has("secret")) secret = settingsJson.get("secret").getAsString();
         String web;
         if (settingsJson.has("web")) {
             web = settingsJson.get("web").getAsString();
@@ -612,7 +615,7 @@ public class Main {
                 return;
             }
             try {
-                out.add(new Gson().fromJson(frame.text(), JsonObject.class));
+                out.add(gson.fromJson(frame.text(), JsonObject.class));
             } catch (JsonSyntaxException ignored) {
             }
         }
@@ -755,6 +758,24 @@ public class Main {
                     if (playerChecks(jsonObject)) {
                         ctx.close();
                         return;
+                    }
+                    if (!jsonObject.has("token")) {
+                        ctx.close();
+                        return;
+                    }
+                    if (!secret.isEmpty()) {
+                        String token = jsonObject.get("token").getAsString();
+                        try (AsyncHttpClient asyncHttpClient = Dsl.asyncHttpClient()) {
+                            JsonObject resp = gson.fromJson(new InputStreamReader(asyncHttpClient.preparePost("https://challenges.cloudflare.com/turnstile/v0/siteverify").addFormParam("secret", secret).addFormParam("response", token).execute().toCompletableFuture().join().getResponseBodyAsStream()), JsonObject.class);
+                            if (!resp.has("success") || !resp.get("success").getAsBoolean()) {
+                                ctx.close();
+                                return;
+                            }
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                            ctx.close();
+                            return;
+                        }
                     }
                     JsonObject player = jsonObject.getAsJsonObject("player");
                     String name = player.remove("name").getAsString().replaceAll("[^A-Za-z0-9_]", "");

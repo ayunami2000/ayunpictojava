@@ -3,6 +3,7 @@
 
 <title>Pictochat Online</title>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 <script src="howler.min.js"></script>
 <script src="pixi.min.js"></script>
 <link rel="stylesheet" href="nano.min.css"/>
@@ -32,7 +33,7 @@
     select, textarea, input[type="text"], input[type="password"],
     input[type="datetime"], input[type="datetime-local"],
     input[type="date"], input[type="month"], input[type="time"],
-    input[type="week"], input[type="number"], input[type="email"], 
+    input[type="week"], input[type="number"], input[type="email"],
     input[type="tel"], input[type="url"]{ font-size: 16px; }
 }
 
@@ -177,6 +178,8 @@ input[type=text] {
 		<img src="images/other_settings.png" id="other_settings" onclick="otherSettings()"></img>
 		<br/><br/>
 		<a href="https://discord.gg/3MaxKkf3YM"><img src="images/discord.png" id="discord"></img></a>
+		<br/>
+		<div style="transform: scale(0.31);" class="cf-turnstile" data-sitekey="0x4AAAAAAAE7tg6O9EI2mSfS" data-callback="setVerificationToken"></div>
 		</div>
 	</div>
 	<div id="settings">
@@ -249,13 +252,19 @@ function fixUserbox(object) {
 	object.value = desired;
 }
 
+var token = "";
+
+function setVerificationToken(t) {
+	token = t;
+}
+
 function requestVerification() {
 	var color = pickr.getColor().toHEXA().toString().replace("#", "0x");
 	playerData.name = document.getElementById("name_box").value;
 	var desired = playerData.name.replace(/[^\w\s]/gi, '');
 	playerData.name = desired;
 	playerData.color = parseInt(color, 16);
-	var obj = { type: 'cl_verifyName', player: playerData };
+	var obj = { type: 'cl_verifyName', player: playerData, token: token };
 	websocket.send(JSON.stringify(obj));
 }
 
