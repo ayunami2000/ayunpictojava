@@ -480,6 +480,15 @@ public class Main {
         System.out.println("Starting ayunpictojava by ayunami2000 on " + host + ":" + port + "!");
         ChannelFuture f = b.bind(host, port);
 
+        if (System.console() == null) {
+            f.sync();
+            f.channel().closeFuture().sync();
+            workerGroup.shutdownGracefully();
+            bossGroup.shutdownGracefully();
+            jda.shutdown();
+            return;
+        }
+
         BufferedReader consoleReader = new BufferedReader(new InputStreamReader(System.in));
         boolean running = true;
         while (running) {
