@@ -252,13 +252,14 @@ function fixUserbox(object) {
 	object.value = desired;
 }
 
-var token = "";
+var token = false; // set this to true if no captcha
 
 function setVerificationToken(t) {
 	token = t;
 }
 
 function requestVerification() {
+	if (!token) return;
 	var color = pickr.getColor().toHEXA().toString().replace("#", "0x");
 	playerData.name = document.getElementById("name_box").value;
 	var desired = playerData.name.replace(/[^\w\s]/gi, '');
