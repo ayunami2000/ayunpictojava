@@ -242,6 +242,7 @@ app.loader.load((loader, resources) => {
 					app.stage.addChild(pc_sprites.textboxes[pc_sprites.textboxes.length - 1]);
 					selectedTextbox = pc_sprites.textboxes.length - 1;
 					sounds.drop_letter.play();
+					scaleStage();
 				}
 			}
 			this.draggingState = 0;

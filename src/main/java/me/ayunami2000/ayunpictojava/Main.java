@@ -905,8 +905,8 @@ public class Main {
                             String text = textboxObject.remove("text").getAsString();
                             if (text == null) continue;
                             if (text.length() > 256) text = text.substring(0, 256);
-                            double x = Math.max(0, Math.min(23.0, Math.max(266.0, textboxObject.remove("x").getAsDouble())));
-                            double y = Math.max(0, Math.min(208.0, Math.max(278.0, textboxObject.remove("y").getAsDouble())));
+                            double x = Math.max(13.0, Math.min(256.0, textboxObject.remove("x").getAsDouble()));
+                            double y = Math.max(198.0, Math.min(268.0, textboxObject.remove("y").getAsDouble()));
                             if (x <= 110.0 && y <= 226.0) {
                                 x = 110.0;
                                 y = 226.0;
@@ -936,8 +936,8 @@ public class Main {
                         JsonObject drawingObject = (JsonObject) drawing;
                         if (drawingObject.has("type") && drawingObject.has("x") && drawingObject.has("y")) {
                             int type = Math.max(0, Math.min(6, drawingObject.remove("type").getAsInt()));
-                            double x = Math.max(0, Math.min(22.0, Math.max(254.0, drawingObject.remove("x").getAsDouble())));
-                            double y = Math.max(0, Math.min(208.0, Math.max(291.0, drawingObject.remove("y").getAsDouble())));
+                            double x = Math.max(22.0, Math.min(254.0, drawingObject.remove("x").getAsDouble()));
+                            double y = Math.max(208.0, Math.min(291.0, drawingObject.remove("y").getAsDouble()));
                             if (x <= 110.0 && y <= 226.0) {
                                 x = 110.0;
                                 y = 226.0;
