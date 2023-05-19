@@ -663,6 +663,8 @@ public class Main {
 
         private static final AttributeKey<Long> COOLDOWN = AttributeKey.newInstance("cooldown");
 
+        private static final AttributeKey<Long> JOIN_COOLDOWN = AttributeKey.newInstance("join-cooldown");
+
         private static final Set<InetAddress> ABUSERS = new HashSet<>();
 
         private static final Map<InetAddress, AtomicInteger> CONS_PER_IP = new HashMap<>();
@@ -823,19 +825,16 @@ public class Main {
                     Map<JsonObject, ChannelHandlerContext> USERS = getUsersForRoomId(roomId);
                     if (USERS == null) return;
                     ctx.channel().attr(ROOM_ID).set(roomId);
-                    if (USERS.size() > 16 || ABUSERS.contains(ip)) {
+                    if (USERS.size() >= 16) return;
+                    if (ABUSERS.contains(ip)) {
                         ctx.close();
                         return;
                     }
                     player = ctx.channel().attr(PLAYER_DATA).get();
-                    if (USERS.containsKey(player)) {
-                        ctx.close();
-                        return;
-                    }
-                    if (USERS.keySet().stream().anyMatch(jsonObject1 -> jsonObject1.get("name").getAsString().equals(player.get("name").getAsString()))) {
-                        ctx.close();
-                        return;
-                    }
+                    if (USERS.containsKey(player)) return;
+                    if (USERS.keySet().stream().anyMatch(jsonObject1 -> jsonObject1.get("name").getAsString().equals(player.get("name").getAsString()))) return;
+                    if (!ctx.channel().hasAttr(JOIN_COOLDOWN)) ctx.channel().attr(JOIN_COOLDOWN).set(0L);
+                    if (ctx.channel().attr(JOIN_COOLDOWN).get() + 5000L > System.currentTimeMillis()) return;
                     USERS.put(player, ctx);
                     res = new JsonObject();
                     res.addProperty("type", "sv_roomData");
@@ -1108,6 +1107,7 @@ public class Main {
                     player = ctx.channel().attr(PLAYER_DATA).get();
                     if (USERS.containsKey(player)) {
                         USERS.remove(player);
+                        ctx.channel().attr(JOIN_COOLDOWN).set(System.currentTimeMillis());
                         JsonObject jsonObject1 = new JsonObject();
                         jsonObject1.addProperty("type", "sv_playerLeft");
                         jsonObject1.add("player", player);
