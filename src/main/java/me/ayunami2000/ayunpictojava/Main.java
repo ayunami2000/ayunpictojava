@@ -322,7 +322,9 @@ public class Main {
                                     }
                                     BufferedImage img;
                                     try {
-                                        img = ImageIO.read(attachment.getProxy().download(w, h).join());
+                                        InputStream is = attachment.getProxy().download(w, h).join();
+                                        img = ImageIO.read(is);
+                                        is.close();
                                     } catch (IOException e) {
                                         content.append(" ").append(attachment.getUrl());
                                         continue;
@@ -766,7 +768,9 @@ public class Main {
                     if (!secret.isEmpty()) {
                         String token = jsonObject.get("token").getAsString();
                         try (AsyncHttpClient asyncHttpClient = Dsl.asyncHttpClient()) {
-                            JsonObject resp = gson.fromJson(new InputStreamReader(asyncHttpClient.preparePost("https://challenges.cloudflare.com/turnstile/v0/siteverify").addFormParam("secret", secret).addFormParam("response", token).execute().toCompletableFuture().join().getResponseBodyAsStream()), JsonObject.class);
+                            InputStream is = asyncHttpClient.preparePost("https://challenges.cloudflare.com/turnstile/v0/siteverify").addFormParam("secret", secret).addFormParam("response", token).execute().toCompletableFuture().join().getResponseBodyAsStream();
+                            JsonObject resp = gson.fromJson(new InputStreamReader(is), JsonObject.class);
+                            is.close();
                             if (!resp.has("success") || !resp.get("success").getAsBoolean()) {
                                 ctx.close();
                                 return;
