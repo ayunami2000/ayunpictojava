@@ -236,10 +236,8 @@ app.loader.load((loader, resources) => {
 				if(mousePos.x > 23 - dragOffset.x && mousePos.x < 21+245 + dragOffset.x && mousePos.y > 208 - dragOffset.y && mousePos.y < 208+70 - dragOffset.y
 				&& !(mousePos.x <= 110 - dragOffset.x && mousePos.y <= 226 - dragOffset.y)) {
 					var txt = new PIXI.BitmapText(draggedTb.text, ndsFont);
-					txt.x = draggedTb.x;
-					txt.y = draggedTb.y;
-					txt.scale.x *= SCALE;
-					txt.scale.y *= SCALE;
+					txt.x = draggedTb.x / SCALE;
+					txt.y = draggedTb.y / SCALE;
 					pc_sprites.textboxes.push(txt);
 					app.stage.addChild(pc_sprites.textboxes[pc_sprites.textboxes.length - 1]);
 					selectedTextbox = pc_sprites.textboxes.length - 1;
@@ -651,20 +649,18 @@ app.loader.load((loader, resources) => {
 			var direction = (targetY - pc_sprites.scrollContainer.y) > 0 ? 1 : -1;
 			var interval = setInterval(function() {
 				pc_sprites.scrollContainer.y += 4 * SCALE * direction * speed;
-				pc_sprites.scrollContainer.origy = pc_sprites.scrollContainer.y / SCALE;
 				if(direction == 1) {
 					if(pc_sprites.scrollContainer.y >= targetY) {
 						clearInterval(interval);
 						pc_sprites.scrollContainer.y = targetY;
-						pc_sprites.scrollContainer.origy = pc_sprites.scrollContainer.y / SCALE;
 					}
 				} else {
 					if(pc_sprites.scrollContainer.y <= targetY) {
 						clearInterval(interval);
 						pc_sprites.scrollContainer.y = targetY;
-						pc_sprites.scrollContainer.origy = pc_sprites.scrollContainer.y / SCALE;
 					}
 				}
+				pc_sprites.scrollContainer.origy = pc_sprites.scrollContainer.y / SCALE;
 			}, 1000/60);
 		} else {
 			pc_sprites.scrollContainer.y = targetY;

@@ -897,16 +897,21 @@ public class Main {
                         return;
                     }
                     StringBuilder textRawBuilder = new StringBuilder();
-                    JsonArray textboxes = jsonObject.getAsJsonObject("message").getAsJsonArray("textboxes");
+                    JsonArray textboxes = jsonObject.getAsJsonObject("message").remove("textboxes").getAsJsonArray();
                     JsonArray textboxesOut = new JsonArray();
                     for (JsonElement textbox : textboxes) {
                         if (!textbox.isJsonObject()) continue;
                         JsonObject textboxObject = (JsonObject) textbox;
                         if (textboxObject.has("text") && textboxObject.has("x") && textboxObject.has("y")) {
                             String text = textboxObject.remove("text").getAsString();
-                            if (text.length() > 40) text = text.substring(0, 40);
-                            double x = textboxObject.get("x").getAsDouble();
-                            double y = textboxObject.get("y").getAsDouble();
+                            if (text == null) continue;
+                            if (text.length() > 256) text = text.substring(0, 256);
+                            double x = Math.max(0, Math.min(23.0, Math.max(266.0, textboxObject.remove("x").getAsDouble())));
+                            double y = Math.max(0, Math.min(208.0, Math.max(278.0, textboxObject.remove("y").getAsDouble())));
+                            if (x <= 110.0 && y <= 226.0) {
+                                x = 110.0;
+                                y = 226.0;
+                            }
                             boolean duplicate = false;
                             for (JsonElement jsonElement : textboxesOut) {
                                 JsonObject jsonObject1 = jsonElement.getAsJsonObject();
@@ -916,18 +921,41 @@ public class Main {
                                 }
                             }
                             if (duplicate) continue;
+                            textboxObject.addProperty("x", x);
+                            textboxObject.addProperty("y", y);
                             textboxObject.addProperty("text", text);
                             textboxesOut.add(textboxObject);
                             textRawBuilder.append("\n").append(text);
-                            if (textboxesOut.size() >= 50) break;
+                            if (textboxesOut.size() >= 256) break;
                         }
                     }
                     String textRaw = textRawBuilder.toString().trim();
+                    JsonArray drawings = jsonObject.getAsJsonObject("message").remove("drawing").getAsJsonArray();
+                    JsonArray drawingsOut = new JsonArray();
+                    for (JsonElement drawing : drawings) {
+                        if (!drawing.isJsonObject()) continue;
+                        JsonObject drawingObject = (JsonObject) drawing;
+                        if (drawingObject.has("type") && drawingObject.has("x") && drawingObject.has("y")) {
+                            int type = Math.max(0, Math.min(6, drawingObject.remove("type").getAsInt()));
+                            double x = Math.max(0, Math.min(22.0, Math.max(254.0, drawingObject.remove("x").getAsDouble())));
+                            double y = Math.max(0, Math.min(208.0, Math.max(291.0, drawingObject.remove("y").getAsDouble())));
+                            if (x <= 110.0 && y <= 226.0) {
+                                x = 110.0;
+                                y = 226.0;
+                            }
+                            drawingObject.addProperty("x", x);
+                            drawingObject.addProperty("y", y);
+                            drawingObject.addProperty("type", type);
+                            drawingsOut.add(drawingObject);
+                        }
+                    }
                     player = ctx.channel().attr(PLAYER_DATA).get();
                     jsonObject.remove("type");
                     jsonObject.addProperty("type", "sv_receivedMessage");
                     jsonObject.getAsJsonObject("message").remove("player");
                     jsonObject.getAsJsonObject("message").add("player", player);
+                    jsonObject.getAsJsonObject("message").add("textboxes", textboxesOut);
+                    jsonObject.getAsJsonObject("message").add("drawing", drawingsOut);
                     sendToOthers(player, jsonObject, USERS);
                     channel = getDiscordChannelForRoomId(roomId);
                     if (channel != null) {
