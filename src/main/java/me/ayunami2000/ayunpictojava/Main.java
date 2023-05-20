@@ -311,14 +311,14 @@ public class Main {
                                         content.append(" ").append(attachment.getUrl());
                                         continue;
                                     }
-                                    int a = w / Math.max(1, h / 64);
-                                    int b = h / Math.max(1, w / 224);
+                                    double a = (double) w / ((double) h / 64.0);
+                                    double b = (double) h / ((double) w / 224.0);
                                     if (b > 64) {
-                                        w = a;
+                                        w = Math.max(1, (int) a);
                                         h = 64;
                                     } else if (a > 224) {
                                         w = 224;
-                                        h = b;
+                                        h = Math.max(1, (int) b);
                                     }
                                     BufferedImage img;
                                     try {
@@ -352,6 +352,18 @@ public class Main {
                                 } else {
                                     return;
                                 }
+								if (content.toString().equalsIgnoreCase("!list")) {
+									Set<JsonObject> players = new HashMap<>(USERS).keySet();
+									StringBuilder resp = new StringBuilder();
+									for (JsonObject pl : players) resp.append(pl.get("name").getAsString()).append(" ; ");
+									if (resp.length() >= 3) {
+										resp.delete(resp.length() - 3, resp.length());
+									} else {
+										resp.append("(nobody is online)");
+									}
+									event.getMessage().reply(filterMsg(resp.toString())).queue();
+									return;
+								}
                                 JsonObject jsonObject = new JsonObject();
                                 jsonObject.addProperty("type", "sv_receivedMessage");
                                 JsonObject message = new JsonObject();
@@ -602,6 +614,7 @@ public class Main {
             }
         }
 
+		System.exit(0); // fack u
         f.channel().closeFuture().sync();
         workerGroup.shutdownGracefully();
         bossGroup.shutdownGracefully();
@@ -931,6 +944,56 @@ public class Main {
                         }
                     }
                     String textRaw = textRawBuilder.toString().trim();
+					if (textRaw.equalsIgnoreCase("!list")) {
+						jsonObject = new JsonObject();
+						jsonObject.addProperty("type", "sv_receivedMessage");
+						JsonObject message = new JsonObject();
+						JsonArray drawings = new JsonArray();
+						JsonObject drawing = new JsonObject();
+						drawing.addProperty("x", 0);
+						drawing.addProperty("y", 0);
+						drawing.addProperty("type", 3);
+						drawings.add(drawing);
+						message.add("drawing", drawings);
+						textboxes = new JsonArray();
+						Set<JsonObject> players = new HashMap<>(USERS).keySet();
+						StringBuilder content = new StringBuilder();
+						for (JsonObject pl : players) content.append(pl.get("name").getAsString()).append(" ; ");
+						if (content.length() >= 3) {
+							content.delete(content.length() - 3, content.length());
+						} else {
+							content.append("(nobody is online)");
+						}
+						String[] lines;
+						if (content.length() > 25) {
+							String firstLine = content.substring(0, 25);
+							String[] lastLines = content.substring(25).split("(?<=\\G.{40})", 4);
+							lines = new String[lastLines.length + 1];
+							System.arraycopy(lastLines, 0, lines, 1, lastLines.length);
+							lines[0] = firstLine;
+							String lastLine = lines[lines.length - 1];
+							if (lastLine.length() > 37)
+								lines[lines.length - 1] = lastLine.substring(0, 37) + "...";
+						} else {
+							lines = new String[]{content.toString().toString()};
+						}
+						for (int i = 0; i < lines.length; i++) {
+							JsonObject textbox = new JsonObject();
+							textbox.addProperty("x", i == 0 ? 113 : 27);
+							textbox.addProperty("y", 211 + i * 16);
+							textbox.addProperty("text", lines[i]);
+							textboxes.add(textbox);
+						}
+						message.add("textboxes", textboxes);
+						message.addProperty("lines", lines.length);
+						player = new JsonObject();
+						player.addProperty("name", "SERVER");
+						player.addProperty("color", 51356);
+						message.add("player", player);
+						jsonObject.add("message", message);
+						ctx.writeAndFlush(jsonObject);
+						return;
+					}
                     JsonArray drawings = jsonObject.getAsJsonObject("message").remove("drawing").getAsJsonArray();
                     JsonArray drawingsOut = new JsonArray();
                     for (JsonElement drawing : drawings) {
