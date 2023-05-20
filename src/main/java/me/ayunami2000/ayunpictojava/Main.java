@@ -1096,7 +1096,7 @@ public class Main {
                                 GeneralPath polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
                                 polyline.moveTo(0, 0);
 								boolean rainbow = false;
-								int rainbowDeg = 0;
+								int rainbowDeg = 348;
                                 for (JsonElement jsonElement : drawing) {
 									if (!jsonElement.isJsonObject()) continue;
                                     JsonObject drawingObj = jsonElement.getAsJsonObject();
