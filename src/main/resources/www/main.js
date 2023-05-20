@@ -89,12 +89,41 @@ app.loader.load((loader, resources) => {
       sounds.key_down.play();
     }
   };
+
+  var sendBtn, renewBtn, bigPenBtn, smallPenBtn, penBtn, eraserBtn, scrollUpBtn, scrollDownBtn, clearBtn;
+
+  var eraserPenMode = false,
+	  bigPenMode = true;
   
   window.onkeyup=function(e){
     if(joinedRoom){
       const key = e.key.replace("Backspace","BACKSPACE").replace("Enter","ENTER");
       if(key!="Shift"&&key!="CapsLock"&&(keys_NORMAL.includes(key)||keys_CAPS.includes(key)||keys_SHIFT.includes(key)))addCharacterDirect(key);
-      sounds.key_up.play();
+	  if (key == "ArrowUp") {
+		  sendBtn.emit("pointerup");
+	  } else if (key == "ArrowDown") {
+		  renewBtn.emit("pointerup");
+	  } else if (key == "Control") {
+		  if (bigPenMode) {
+			  smallPenBtn.emit("pointerup");
+		  } else {
+			  bigPenBtn.emit("pointerup");
+		  }
+	  } else if (key == "Alt") {
+		  if (eraserPenMode) {
+			  penBtn.emit("pointerup");
+		  } else {
+			  eraserBtn.emit("pointerup");
+		  }
+	  } else if (key == "ArrowLeft" || key == "PageUp") {
+		  scrollUpBtn.emit("pointerup");
+	  } else if (key == "ArrowRight" || key == "PageDown") {
+		  scrollDownBtn.emit("pointerup");
+	  } else if (key == "Delete") {
+		  clearBtn.emit("pointerup");
+	  } else {
+		  sounds.key_up.play();
+	  }
     }
   };
 
@@ -184,18 +213,18 @@ app.loader.load((loader, resources) => {
 		createKbButton(186, 360, 15, 14, keyIndex);
 		keyIndex++;
 		
-		createStageButton(225, 296, 31, 30, "SEND");
-		createStageButton(225, 327, 31, 23, "RENEW");
-		createStageButton(225, 351, 31, 24, "CLEAR");
+		sendBtn = createStageButton(225, 296, 31, 30, "SEND");
+		renewBtn = createStageButton(225, 327, 31, 23, "RENEW");
+		clearBtn = createStageButton(225, 351, 31, 24, "CLEAR");
 		
-		createStageButton(2, 263, 14, 14, "BIG_PEN");
-		createStageButton(2, 278, 14, 14, "SMALL_PEN");
+		bigPenBtn = createStageButton(2, 263, 14, 14, "BIG_PEN");
+		smallPenBtn = createStageButton(2, 278, 14, 14, "SMALL_PEN");
 		
-		createStageButton(2, 230, 14, 13, "PEN_MODE");
-		createStageButton(2, 244, 14, 13, "ERASER_MODE");
+		penBtn = createStageButton(2, 230, 14, 13, "PEN_MODE");
+		eraserBtn = createStageButton(2, 244, 14, 13, "ERASER_MODE");
 		
-		createStageButton(2, 194, 14, 14, "SCROLL_UP");
-		createStageButton(2, 209, 14, 14, "SCROLL_DOWN");
+		scrollUpBtn = createStageButton(2, 194, 14, 14, "SCROLL_UP");
+		scrollDownBtn = createStageButton(2, 209, 14, 14, "SCROLL_DOWN");
 		
 		createStageButton(245, 193, 10, 10, "EXIT");
 		
@@ -300,6 +329,7 @@ app.loader.load((loader, resources) => {
 					break;
 				}
 				case "BIG_PEN": {
+					bigPenMode = true;
 					sounds.big_pen.play();
 					var action = { x: 0, y: 0, type: 3 };
 					drawHistory.push(action);
@@ -307,6 +337,7 @@ app.loader.load((loader, resources) => {
 					break;
 				}
 				case "SMALL_PEN": {
+					bigPenMode = false;
 					sounds.small_pen.play();
 					var action = { x: 0, y: 0, type: 4 };
 					drawHistory.push(action);
@@ -314,6 +345,7 @@ app.loader.load((loader, resources) => {
 					break;
 				}
 				case "PEN_MODE": {
+					eraserPenMode = false;
 					sounds.pen.play();
 					var action = { x: 0, y: 0, type: 5 };
 					drawHistory.push(action);
@@ -321,6 +353,7 @@ app.loader.load((loader, resources) => {
 					break;
 				}
 				case "ERASER_MODE": {
+					eraserPenMode = true;
 					sounds.eraser.play();
 					var action = { x: 0, y: 0, type: 6 };
 					drawHistory.push(action);
