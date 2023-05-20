@@ -93,7 +93,8 @@ app.loader.load((loader, resources) => {
   var sendBtn, renewBtn, bigPenBtn, smallPenBtn, penBtn, eraserBtn, scrollUpBtn, scrollDownBtn, clearBtn;
 
   var eraserPenMode = false,
-	  bigPenMode = true;
+	  bigPenMode = true,
+      rainbowPenMode = false;
   
   window.onkeyup=function(e){
     if(joinedRoom){
@@ -104,18 +105,20 @@ app.loader.load((loader, resources) => {
 	  } else if (key == "ArrowDown") {
 		  renewBtn.emit("pointerup");
 	  } else if (key == "Control") {
+          e.preventDefault();
 		  if (bigPenMode) {
 			  smallPenBtn.emit("pointerup");
 		  } else {
 			  bigPenBtn.emit("pointerup");
 		  }
-	  } else if (key == "Alt") {
-		  if (eraserPenMode) {
-			  penBtn.emit("pointerup");
-		  } else {
-			  eraserBtn.emit("pointerup");
-		  }
-	  } else if (key == "ArrowLeft" || key == "PageUp") {
+      } else if (key == "Alt") {
+          e.preventDefault();
+          if (eraserPenMode || !rainbowPenMode) {
+              penBtn.emit("pointerup");
+          } else {
+              eraserBtn.emit("pointerup");
+          }
+      } else if (key == "ArrowLeft" || key == "PageUp") {
 		  scrollUpBtn.emit("pointerup");
 	  } else if (key == "ArrowRight" || key == "PageDown") {
 		  scrollDownBtn.emit("pointerup");
@@ -288,10 +291,17 @@ app.loader.load((loader, resources) => {
 		app.stage.addChild(sb);
 		return sb;
 	}
+
+    var rainbowTintInterval = -1;
 	
 	function createStageButton(x, y, w, h, action) {
 		function performSbAction(act) {
-			switch(act) {
+            if (rainbowTintInterval != -1) {
+                clearInterval(rainbowTintInterval);
+                rainbowTintInterval = -1;
+            }
+            pc_sprites.drawModeSelect.tint = playerData.color;
+            switch(act) {
 				case "SEND": {
 					var message = constructMessageObject();
 					if(isMessageValid(message)) {
@@ -345,21 +355,30 @@ app.loader.load((loader, resources) => {
 					break;
 				}
 				case "PEN_MODE": {
+                    if (!eraserPenMode) rainbowPenMode = !rainbowPenMode;
 					eraserPenMode = false;
 					sounds.pen.play();
-					var action = { x: 0, y: 0, type: 5 };
+					var action = { x: 0, y: 0, type: rainbowPenMode ? 7 : 5 };
 					drawHistory.push(action);
 					pc_sprites.drawModeSelect.y = 230 * SCALE;
+                    if (rainbowPenMode) {
+                        var deg = 0;
+                        rainbowTintInterval = setInterval(function() {
+                            deg = (deg + 3) % 360;
+                            pc_sprites.drawModeSelect.tint = hsl2rgb2dec(deg, 1, 0.5);
+                        }, 100);
+                    }
 					break;
 				}
-				case "ERASER_MODE": {
-					eraserPenMode = true;
-					sounds.eraser.play();
-					var action = { x: 0, y: 0, type: 6 };
-					drawHistory.push(action);
-					pc_sprites.drawModeSelect.y = 244 * SCALE;
-					break;
-				}
+                case "ERASER_MODE": {
+                    eraserPenMode = true;
+                    rainbowPenMode = false;
+                    sounds.eraser.play();
+                    var action = { x: 0, y: 0, type: 6 };
+                    drawHistory.push(action);
+                    pc_sprites.drawModeSelect.y = 244 * SCALE;
+                    break;
+                }
 				case "SCROLL_UP": {
 					sounds.scroll.play();
 					scrollPos--;
@@ -382,6 +401,9 @@ app.loader.load((loader, resources) => {
 					break;
 				}
 			}
+            if (!rainbowPenMode) {
+
+            }
 		}
 		
 		var sb = new PIXI.Sprite(pixel);
@@ -575,7 +597,13 @@ app.loader.load((loader, resources) => {
 		redraw = true;
 	}
 	
-	function generateMessageBox(message) {
+	function generateMessageBox(messageRaw) {
+        var message = {};
+        message.lines = isNaN(messageRaw.lines) ? 1 : Math.max(1, Math.min(5, messageRaw.lines));
+        message.textboxes = Array.isArray(messageRaw.textboxes) ? messageRaw.textboxes : [];
+        message.drawing = Array.isArray(messageRaw.drawing) ? messageRaw.drawing : [];
+        message.player = messageRaw.player;
+
 		var container = new PIXI.Container();
 		var box = new PIXI.Sprite(resources["box_bg" + message.lines].texture);
 		var box_lines = new PIXI.Sprite(resources["box_lines" + message.lines].texture);
@@ -599,13 +627,26 @@ app.loader.load((loader, resources) => {
 		
 		var graphics = new PIXI.Graphics();
 		graphics.drawMode = 0;
+        graphics.rainbowDeg = 0;
 		for(var i = 0; i < message.drawing.length; i++) {
 			var action = message.drawing[i];
+            if (action == null) continue;
+            action.x = isNaN(action.x) ? 22 : Math.max(22, Math.min(254, action.x));
+            action.y = isNaN(action.y) ? 208 : Math.max(208, Math.min(291, action.y));
+            if (action.x <= 110 && action.y <= 226) {
+                action.x = 110;
+                action.y = 226;
+            }
+            action.type = isNaN(action.type) ? -1 : Math.max(0, Math.min(7, action.type));
 			action.x -= pc_sprites.box.x/SCALE;
 			action.y -= pc_sprites.box.y/SCALE;
 			switch(action.type) {
+                case -1: {
+                    break;
+                }
 				case 0: {
 					graphics.lineTo(action.x, action.y);
+                    if (graphics.drawMode == 0xffffff) graphics.rainbowDeg = (graphics.rainbowDeg + 12) % 360;
 					break;
 				}
 				case 1: {
@@ -632,18 +673,38 @@ app.loader.load((loader, resources) => {
 					graphics.drawMode = 0xfbfbfb;
 					break;
 				}
+                case 7: {
+                    graphics.drawMode = 0xffffff;
+                    break;
+                }
 			}
-			graphics.lineStyle(graphics.drawWidth + ((graphics.drawMode > 0) * (graphics.drawWidth == 2)), graphics.drawMode);
+            if (graphics.drawMode == 0xffffff) {
+                graphics.lineStyle(graphics.drawWidth, hsl2rgb2dec(graphics.rainbowDeg, 1, 0.5));
+            } else {
+                graphics.lineStyle(graphics.drawWidth + ((graphics.drawMode > 0) * (graphics.drawWidth == 2)), graphics.drawMode);
+            }
 		}
 		
 		container.addChild(graphics);
+
+        var ii = 0;
 		
 		for(var i = 0; i < message.textboxes.length; i++) {
 			var txt = message.textboxes[i];
+            if (txt == null) continue;
+            txt.x = isNaN(txt.x) ? 13 : Math.max(13, Math.min(256, txt.x));
+            txt.y = isNaN(txt.y) ? 198 : Math.max(198, Math.min(268, txt.y));
+            if (txt.x <= 110 && txt.y <= 226) {
+                txt.x = 110;
+                txt.y = 226;
+            }
+            txt.text = "" + txt.text;
+            if (txt.text.length > 255) txt.text = txt.text.slice(0, 255);
 			var tb = new PIXI.BitmapText(txt.text, ndsFont);
 			tb.x = txt.x - pc_sprites.box.x/SCALE;
 			tb.y = txt.y - pc_sprites.box.y/SCALE;
 			container.addChild(tb);
+            if (++ii > 255) break;
 		}
 		
 		pc_sprites.scrollContainer.addChild(container);
@@ -1160,11 +1221,13 @@ app.loader.load((loader, resources) => {
 	function drawDrawing() {
 		pc_sprites.drawing.clear();
 		pc_sprites.drawing.drawMode = 0;
+        pc_sprites.drawing.rainbowDeg = 0;
 		for(var i = 0; i < drawHistory.length; i++) {
 			var action = drawHistory[i];
 			switch(action.type) {
 				case 0: {
 					pc_sprites.drawing.lineTo(action.x, action.y);
+                    if (pc_sprites.drawing.drawMode == 0xffffff) pc_sprites.drawing.rainbowDeg = (pc_sprites.drawing.rainbowDeg + 12) % 360;
 					break;
 				}
 				case 1: {
@@ -1191,8 +1254,16 @@ app.loader.load((loader, resources) => {
 					pc_sprites.drawing.drawMode = 0xfbfbfb;
 					break;
 				}
+                case 7: {
+                    pc_sprites.drawing.drawMode = 0xffffff;
+                    break;
+                }
 			}
-			pc_sprites.drawing.lineStyle(pc_sprites.drawing.drawWidth + ((pc_sprites.drawing.drawMode > 0) * (pc_sprites.drawing.drawWidth == 2)), pc_sprites.drawing.drawMode);
+            if (pc_sprites.drawing.drawMode == 0xffffff) {
+                pc_sprites.drawing.lineStyle(pc_sprites.drawing.drawWidth, hsl2rgb2dec(pc_sprites.drawing.rainbowDeg, 1, 0.5));
+            } else {
+                pc_sprites.drawing.lineStyle(pc_sprites.drawing.drawWidth + ((pc_sprites.drawing.drawMode > 0) * (pc_sprites.drawing.drawWidth == 2)), pc_sprites.drawing.drawMode);
+            }
 		}
 		redraw = false;
 	}
@@ -1322,4 +1393,11 @@ function lerp(v0, v1, t) {
 function getDbMessage(index, username, password) {
 	var obj = { type: 'cl_getDbMessage', index: index, username: username, password: password };
 	websocket.send(JSON.stringify(obj));
+}
+
+// https://stackoverflow.com/a/64090995/6917520
+function hsl2rgb2dec(h,s,l) {
+    let a=s*Math.min(l,1-l);
+    let f= (n,k=(n+h/30)%12) => 255 * (l - a*Math.max(Math.min(k-3,9-k,1),-1));
+    return (f(0) << 16) + (f(8) << 8) + f(4);
 }

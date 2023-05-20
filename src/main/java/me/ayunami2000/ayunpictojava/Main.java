@@ -41,6 +41,7 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -466,8 +467,9 @@ public class Main {
                             @Override
                             protected void channelRead0(ChannelHandlerContext ctx, HttpRequest request) throws NoSuchFieldException, IllegalAccessException {
                                 pipeline.remove("http-websocket-detector");
-                                String ip = request.headers().get("X-FORWARDED-FOR").split(",", 2)[0];
+                                String ip = request.headers().get("X-FORWARDED-FOR");
                                 if (ip != null) {
+									ip = ip.split(",", 2)[0];
                                     Field remoteAddressField = AbstractChannel.class.getDeclaredField("remoteAddress");
                                     remoteAddressField.setAccessible(true);
                                     remoteAddressField.set(ctx.channel(), new InetSocketAddress(ip, 0));
@@ -622,11 +624,19 @@ public class Main {
     }
 
     static class WebSocketFrameToJsonObjectDecoder extends MessageToMessageDecoder<TextWebSocketFrame> {
+		private static final AttributeKey<ScheduledFuture> PING_SCHEDULE = AttributeKey.valueOf("ping_schedule");
+
         @Override
         protected void decode(ChannelHandlerContext ctx, TextWebSocketFrame frame, List<Object> out) {
             if (frame.text().equals("pong")) {
+				if (ctx.channel().hasAttr(PING_SCHEDULE)) ctx.channel().attr(PING_SCHEDULE).getAndSet(null).cancel(false);
                 ctx.channel().eventLoop().schedule(() -> {
-                    if (ctx.channel().isOpen()) ctx.writeAndFlush(new TextWebSocketFrame("ping"));
+                    if (ctx.channel().isOpen()) {
+						ctx.writeAndFlush(new TextWebSocketFrame("ping"));
+						ctx.channel().attr(PING_SCHEDULE).set(ctx.channel().eventLoop().schedule(() -> {
+							if (ctx.channel().isOpen()) ctx.close();
+						}, 10, TimeUnit.SECONDS));
+					}
                 }, 10, TimeUnit.SECONDS);
                 return;
             }
@@ -919,7 +929,7 @@ public class Main {
                         if (textboxObject.has("text") && textboxObject.has("x") && textboxObject.has("y")) {
                             String text = textboxObject.remove("text").getAsString();
                             if (text == null) continue;
-                            if (text.length() > 256) text = text.substring(0, 256);
+                            if (text.length() > 255) text = text.substring(0, 255);
                             double x = Math.max(13.0, Math.min(256.0, textboxObject.remove("x").getAsDouble()));
                             double y = Math.max(198.0, Math.min(268.0, textboxObject.remove("y").getAsDouble()));
                             if (x <= 110.0 && y <= 226.0) {
@@ -940,7 +950,7 @@ public class Main {
                             textboxObject.addProperty("text", text);
                             textboxesOut.add(textboxObject);
                             textRawBuilder.append("\n").append(text);
-                            if (textboxesOut.size() >= 256) break;
+                            if (textboxesOut.size() > 255) break;
                         }
                     }
                     String textRaw = textRawBuilder.toString().trim();
@@ -975,7 +985,7 @@ public class Main {
 							if (lastLine.length() > 37)
 								lines[lines.length - 1] = lastLine.substring(0, 37) + "...";
 						} else {
-							lines = new String[]{content.toString().toString()};
+							lines = new String[]{content.toString()};
 						}
 						for (int i = 0; i < lines.length; i++) {
 							JsonObject textbox = new JsonObject();
@@ -994,13 +1004,14 @@ public class Main {
 						ctx.writeAndFlush(jsonObject);
 						return;
 					}
+					/*
                     JsonArray drawings = jsonObject.getAsJsonObject("message").remove("drawing").getAsJsonArray();
                     JsonArray drawingsOut = new JsonArray();
                     for (JsonElement drawing : drawings) {
                         if (!drawing.isJsonObject()) continue;
                         JsonObject drawingObject = (JsonObject) drawing;
                         if (drawingObject.has("type") && drawingObject.has("x") && drawingObject.has("y")) {
-                            int type = Math.max(0, Math.min(6, drawingObject.remove("type").getAsInt()));
+                            int type = Math.max(0, Math.min(7, drawingObject.remove("type").getAsInt()));
                             double x = Math.max(22.0, Math.min(254.0, drawingObject.remove("x").getAsDouble()));
                             double y = Math.max(208.0, Math.min(291.0, drawingObject.remove("y").getAsDouble()));
                             if (x <= 110.0 && y <= 226.0) {
@@ -1013,13 +1024,14 @@ public class Main {
                             drawingsOut.add(drawingObject);
                         }
                     }
+                    */
                     player = ctx.channel().attr(PLAYER_DATA).get();
                     jsonObject.remove("type");
                     jsonObject.addProperty("type", "sv_receivedMessage");
                     jsonObject.getAsJsonObject("message").remove("player");
                     jsonObject.getAsJsonObject("message").add("player", player);
                     jsonObject.getAsJsonObject("message").add("textboxes", textboxesOut);
-                    jsonObject.getAsJsonObject("message").add("drawing", drawingsOut);
+                    // jsonObject.getAsJsonObject("message").add("drawing", drawingsOut);
                     sendToOthers(player, jsonObject, USERS);
                     channel = getDiscordChannelForRoomId(roomId);
                     if (channel != null) {
@@ -1083,17 +1095,36 @@ public class Main {
                                 g2d.setColor(fgColor);
                                 GeneralPath polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
                                 polyline.moveTo(0, 0);
+								boolean rainbow = false;
+								int rainbowDeg = 0;
                                 for (JsonElement jsonElement : drawing) {
+									if (!jsonElement.isJsonObject()) continue;
                                     JsonObject drawingObj = jsonElement.getAsJsonObject();
                                     if (!drawingObj.has("type")) continue;
                                     if (!drawingObj.has("x")) continue;
                                     if (!drawingObj.has("y")) continue;
-                                    int type = drawingObj.get("type").getAsInt();
-                                    double x = drawingObj.get("x").getAsDouble() - 22;
-                                    double y = drawingObj.get("y").getAsDouble() - 208;
+                                    int type = Math.max(-1, Math.min(7, drawingObj.get("type").getAsInt()));
+									double x = Math.max(0.0, Math.min(232.0, drawingObj.get("x").getAsDouble() - 22.0));
+									double y = Math.max(0.0, Math.min(83.0, drawingObj.get("y").getAsDouble() - 208.0));
+									if (x <= 88.0 && y <= 18.0) {
+										x = 88.0;
+										y = 18.0;
+									}
                                     switch (type) {
+										case -1:
+											break;
                                         case 0:
                                             polyline.lineTo(x, y);
+											if (rainbow) {
+												Point2D point = polyline.getCurrentPoint();
+												if (point != null) {
+													g2d.draw(polyline);
+													polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
+													polyline.moveTo(point.getX(), point.getY());
+												}
+												rainbowDeg = (rainbowDeg + 12) % 360;
+												g2d.setColor(Color.getHSBColor(rainbowDeg / 360F, 1F, 1F));
+											}
                                             break;
                                         case 1:
                                         case 2:
@@ -1125,6 +1156,7 @@ public class Main {
                                                 polyline.moveTo(point.getX(), point.getY());
                                             }
                                             g2d.setColor(fgColor);
+											rainbow = false;
                                             break;
                                         case 6:
                                             point = polyline.getCurrentPoint();
@@ -1134,13 +1166,18 @@ public class Main {
                                                 polyline.moveTo(point.getX(), point.getY());
                                             }
                                             g2d.setColor(bgColor);
+											rainbow = false;
                                             break;
+										case 7:
+											rainbow = true;
+											break;
                                     }
                                 }
                                 g2d.draw(polyline);
                                 g2d.setStroke(stroke1);
                                 g2d.setColor(fgColor);
                                 for (JsonElement jsonElement : textboxesOut) {
+									if (!jsonElement.isJsonObject()) continue;
                                     JsonObject textboxObj = jsonElement.getAsJsonObject();
                                     if (!textboxObj.has("text")) continue;
                                     if (!textboxObj.has("x")) continue;
