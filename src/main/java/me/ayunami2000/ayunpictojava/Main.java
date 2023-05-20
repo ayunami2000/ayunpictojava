@@ -1114,7 +1114,6 @@ public class Main {
 										case -1:
 											break;
                                         case 0:
-                                            polyline.lineTo(x, y);
 											if (rainbow) {
 												Point2D point = polyline.getCurrentPoint();
 												if (point != null) {
@@ -1125,6 +1124,7 @@ public class Main {
 												rainbowDeg = (rainbowDeg + 12) % 360;
 												g2d.setColor(Color.getHSBColor(rainbowDeg / 360F, 1F, 1F));
 											}
+											polyline.lineTo(x, y);
                                             break;
                                         case 1:
                                         case 2:
