@@ -824,7 +824,6 @@ public class Main {
                     String roomId = jsonObject.get("id").getAsString();
                     Map<JsonObject, ChannelHandlerContext> USERS = getUsersForRoomId(roomId);
                     if (USERS == null) return;
-                    ctx.channel().attr(ROOM_ID).set(roomId);
                     if (USERS.size() >= 16) return;
                     if (ABUSERS.contains(ip)) {
                         ctx.close();
@@ -835,6 +834,7 @@ public class Main {
                     if (USERS.keySet().stream().anyMatch(jsonObject1 -> jsonObject1.get("name").getAsString().equals(player.get("name").getAsString()))) return;
                     if (!ctx.channel().hasAttr(JOIN_COOLDOWN)) ctx.channel().attr(JOIN_COOLDOWN).set(0L);
                     if (ctx.channel().attr(JOIN_COOLDOWN).get() + 5000L > System.currentTimeMillis()) return;
+                    ctx.channel().attr(ROOM_ID).set(roomId);
                     USERS.put(player, ctx);
                     res = new JsonObject();
                     res.addProperty("type", "sv_roomData");
