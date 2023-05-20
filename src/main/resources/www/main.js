@@ -565,14 +565,13 @@ app.loader.load((loader, resources) => {
 		for(var i = 0; i < prevTextboxes.length; i++) {
 			var txt = prevTextboxes[i];
 			var tb = new PIXI.BitmapText(txt.text, ndsFont);
-			tb.x = txt.x * SCALE;
-			tb.y = txt.y * SCALE;
-			tb.scale.x *= SCALE;
-			tb.scale.y *= SCALE;
+			tb.x = txt.x;
+			tb.y = txt.y;
 			pc_sprites.textboxes.push(tb);
 			app.stage.addChild(pc_sprites.textboxes[pc_sprites.textboxes.length - 1]);
 		}
 		selectedTextbox = 0;
+        scaleStage();
 		redraw = true;
 	}
 	
