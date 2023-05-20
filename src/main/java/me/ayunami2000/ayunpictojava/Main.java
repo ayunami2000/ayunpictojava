@@ -624,7 +624,7 @@ public class Main {
     }
 
     static class WebSocketFrameToJsonObjectDecoder extends MessageToMessageDecoder<TextWebSocketFrame> {
-		private static final AttributeKey<ScheduledFuture> PING_SCHEDULE = AttributeKey.valueOf("ping_schedule");
+		private static final AttributeKey<ScheduledFuture<?>> PING_SCHEDULE = AttributeKey.valueOf("ping-schedule");
 
         @Override
         protected void decode(ChannelHandlerContext ctx, TextWebSocketFrame frame, List<Object> out) {
