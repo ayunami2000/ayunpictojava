@@ -523,6 +523,7 @@ public class Main {
                         System.out.println("Invalid room! Please specify one of: \"room_a\" ; \"room_b\" ; \"room_c\" ; \"room_d\"");
                         break;
                     }
+                    USERS = new HashMap<>(USERS);
                     boolean done = false;
                     for (JsonObject player : USERS.keySet()) {
                         if (player.get("name").getAsString().equals(cmd[1])) {
@@ -643,6 +644,7 @@ public class Main {
     private static final Map<JsonObject, ChannelHandlerContext> USERS_D = new HashMap<>();
 
     private static void sendToOthers(JsonObject player, JsonObject jsonObject, Map<JsonObject, ChannelHandlerContext> USERS) {
+        USERS = new HashMap<>(USERS);
         for (JsonObject user : USERS.keySet()) {
             if (user.equals(player)) continue;
             USERS.get(user).writeAndFlush(jsonObject);
