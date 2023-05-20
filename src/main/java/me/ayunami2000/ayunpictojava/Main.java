@@ -313,12 +313,12 @@ public class Main {
                                     }
                                     int a = w / Math.max(1, h / 64);
                                     int b = h / Math.max(1, w / 224);
-                                    if (a > 224) {
-                                        w = 224;
-                                        h = b;
-                                    } else if (b > 64) {
+                                    if (b > 64) {
                                         w = a;
                                         h = 64;
+                                    } else if (a > 224) {
+                                        w = 224;
+                                        h = b;
                                     }
                                     BufferedImage img;
                                     try {
