@@ -52,10 +52,12 @@ app.loader.add('enter_room_a', 'images/enter_room_a.png');
 app.loader.add('enter_room_b', 'images/enter_room_b.png');
 app.loader.add('enter_room_c', 'images/enter_room_c.png');
 app.loader.add('enter_room_d', 'images/enter_room_d.png');
+app.loader.add('enter_room_e', 'images/enter_room_e.png');
 app.loader.add('leave_room_a', 'images/leave_room_a.png');
 app.loader.add('leave_room_b', 'images/leave_room_b.png');
 app.loader.add('leave_room_c', 'images/leave_room_c.png');
 app.loader.add('leave_room_d', 'images/leave_room_d.png');
+app.loader.add('leave_room_e', 'images/leave_room_e.png');
 app.loader.add('connection_bad', 'images/connection_bad.png');
 app.loader.load((loader, resources) => {
 	websocket = new WebSocket("ws"+window.location.href.slice(4));
@@ -63,7 +65,7 @@ app.loader.load((loader, resources) => {
 	document.getElementById("root").appendChild(app.view);
 	//document.getElementById("root").appendChild(canvas);
 
-	
+
 
 	var ndsFont = { font: '-16px NintendoDSBIOS', align: 'center', tint: 0 };
 	var ndsFont_name = { font: '-16px NintendoDSBIOS', align: 'left', tint: playerData.color };
@@ -83,7 +85,7 @@ app.loader.load((loader, resources) => {
 	const keys_CAPS = ["1","2","3","4","5","6","7","8","9","0","-","=","Q","W","E","R","T","Y","U","I","O","P","BACKSPACE","CAPS","A","S","D","F","G","H","J","K","L","ENTER","SHIFT","Z","X","C","V","B","N","M",",",".","/",";","\'"," ","[","]"];
 	const keys_SHIFT = ["!","@","#","$","%","^","&","*","(",")","_","+","Q","W","E","R","T","Y","U","I","O","P","BACKSPACE","CAPS","A","S","D","F","G","H","J","K","L","ENTER","SHIFT","Z","X","C","V","B","N","M","<",">","?",":","~"," ","{","}"];
   var joinedRoom = false;
-  
+
   window.onkeydown=function(e){
     if(joinedRoom){
       sounds.key_down.play();
@@ -95,7 +97,7 @@ app.loader.load((loader, resources) => {
   var eraserPenMode = false,
 	  bigPenMode = true,
       rainbowPenMode = false;
-  
+
   window.onkeyup=function(e){
     if(joinedRoom){
       const key = e.key.replace("Backspace","BACKSPACE").replace("Enter","ENTER");
@@ -130,47 +132,83 @@ app.loader.load((loader, resources) => {
     }
   };
 
+  var roomDir = -1;
+
 	function generateRoomButtons(obj) {
 		pc_sprites.roomButtons = [];
-		var urlArray = ["images/room_a.png", "images/room_b.png", "images/room_c.png", "images/room_d.png"];
-		for(var i = 0; i < obj.count.length; i++) {
-			var roomButton = PIXI.Sprite.from(urlArray[i % 4]);
+		var urlArray = ["images/room_a.png", "images/room_b.png", "images/room_c.png", "images/room_d.png", "images/room_e.png"];
+		for(var i = 0; i < obj.ids.length; i++) {
+			var roomButton = PIXI.Sprite.from(urlArray[i % urlArray.length]);
 			roomButton.x = 31;
 			roomButton.y = 224 + i * 32;
-			roomButton.interactive = true;
+			roomButton.interactive = i < 4;
 			roomButton.buttonMode = true;
 			roomButton.roomId = obj.ids[i];
-			roomButton.on('pointerdown', function(event) { 
+			roomButton.on('pointerdown', function(event) {
 				const filter = new PIXI.filters.ColorMatrixFilter();
 				filter.brightness(0.5);
 				this.filters = [filter];
 				this.blendMode = PIXI.BLEND_MODES.NORMAL;
 			});
-			roomButton.on('pointerup', function() { 
+			roomButton.on('pointerup', function() {
 				this.filters = [new PIXI.filters.ColorMatrixFilter()];
-				this.blendMode = PIXI.BLEND_MODES.NORMAL; 
+				this.blendMode = PIXI.BLEND_MODES.NORMAL;
 				var obj = { type: 'cl_joinRoom', player: playerData, id: this.roomId };
 				websocket.send(JSON.stringify(obj));
 			});
-			roomButton.on('pointerupoutside', function() { 
+			roomButton.on('pointerupoutside', function() {
 				this.filters = [new PIXI.filters.ColorMatrixFilter()];
 				this.blendMode = PIXI.BLEND_MODES.NORMAL;
 			});
-			
-			roomButton.pcText = new PIXI.BitmapText("" + obj.count[i] + "/16", ndsFont);
-			roomButton.pcText.x = 161;
-			roomButton.pcText.y = 234 + i * 32;
-			
+
+            if (obj.count.length > i) {
+                roomButton.pcText = new PIXI.BitmapText("" + obj.count[i] + "/16", ndsFont);
+                roomButton.pcText.x = 161;
+                roomButton.pcText.y = 234 + i * 32;
+            }
+
 			pc_sprites.roomButtons.push(roomButton);
 			app.stage.addChild(pc_sprites.roomButtons[i]);
-			app.stage.addChild(pc_sprites.roomButtons[i].pcText);
+            if (obj.count.length > i) app.stage.addChild(pc_sprites.roomButtons[i].pcText);
 		}
+
+        var roomScroll = PIXI.Sprite.from("images/scroll.png");
+        roomScroll.x = 240;
+        roomScroll.y = 351;
+        roomScroll.interactive = true;
+        roomScroll.buttonMode = true;
+        roomScroll.anchor.y = 0.5;
+        roomScroll.on('pointerdown', function(event) {
+            sounds.scroll.play();
+            pc_sprites.roomScroll.interactive = false;
+            pc_sprites.roomScroll.buttonMode = false;
+            var o = 0;
+            var int = setInterval(function() {
+                if (o > 20) return;
+                for (var i = 0; i < pc_sprites.roomButtons.length; i++) {
+                    pc_sprites.roomButtons[i].y += 4 * roomDir;
+                    if (pc_sprites.roomButtons[i].pcText != null) pc_sprites.roomButtons[i].pcText.y += 4 * roomDir;
+                }
+                if (++o >= 20 * (pc_sprites.roomButtons.length - 4)) {
+                    clearInterval(int);
+                    roomDir = -roomDir;
+                    pc_sprites.roomScroll.scale.y = -roomDir * SCALE;
+                    pc_sprites.roomScroll.interactive = true;
+                    pc_sprites.roomScroll.buttonMode = true;
+                    for (var i = 0; i < pc_sprites.roomButtons.length; i++) {
+                        pc_sprites.roomButtons[i].interactive = roomDir > 0 ? (i > 3) : (i < 4);
+                    }
+                }
+            }, 1000/60);
+        });
+        pc_sprites.roomScroll = roomScroll;
+        app.stage.addChild(pc_sprites.roomScroll);
 	}
-	
+
 	function generateStageButtons() {
 		var stageButtons = [];
 		var keyIndex = 0;
-		
+
 		// 1-=
 		for(var i = 0; i < 12; i++) {
 			createKbButton(26 + 16 * i, 297, 15, 14, keyIndex);
@@ -215,25 +253,25 @@ app.loader.load((loader, resources) => {
 		// ]
 		createKbButton(186, 360, 15, 14, keyIndex);
 		keyIndex++;
-		
+
 		sendBtn = createStageButton(225, 296, 31, 30, "SEND");
 		renewBtn = createStageButton(225, 327, 31, 23, "RENEW");
 		clearBtn = createStageButton(225, 351, 31, 24, "CLEAR");
-		
+
 		bigPenBtn = createStageButton(2, 263, 14, 14, "BIG_PEN");
 		smallPenBtn = createStageButton(2, 278, 14, 14, "SMALL_PEN");
-		
+
 		penBtn = createStageButton(2, 230, 14, 13, "PEN_MODE");
 		eraserBtn = createStageButton(2, 244, 14, 13, "ERASER_MODE");
-		
+
 		scrollUpBtn = createStageButton(2, 194, 14, 14, "SCROLL_UP");
 		scrollDownBtn = createStageButton(2, 209, 14, 14, "SCROLL_DOWN");
-		
+
 		createStageButton(245, 193, 10, 10, "EXIT");
-		
+
 		scaleStage();
 	}
-	
+
 	function createKbButton(x, y, w, h, keyIndex) {
 		var sb = new PIXI.Sprite(pixel);
 		sb.x = x;
@@ -293,7 +331,7 @@ app.loader.load((loader, resources) => {
 	}
 
     var rainbowTintInterval = -1;
-	
+
 	function createStageButton(x, y, w, h, action) {
 		function performSbAction(act) {
             if (rainbowTintInterval != -1) {
@@ -405,7 +443,7 @@ app.loader.load((loader, resources) => {
 
             }
 		}
-		
+
 		var sb = new PIXI.Sprite(pixel);
 		sb.x = x;
 		sb.y = y;
@@ -430,7 +468,7 @@ app.loader.load((loader, resources) => {
 		app.stage.addChild(sb);
 		return sb;
 	}
-	
+
 	function getKey(keyIndex) {
 		var keys = [];
 		switch(kbMode) {
@@ -443,11 +481,11 @@ app.loader.load((loader, resources) => {
 		}
 		return keys[keyIndex];
 	}
-  
+
   function addCharacter(keyIndex) {
     return addCharacterDirect(getKey(keyIndex));
   }
-	
+
 	function addCharacterDirect(key) {
 		if(key == "BACKSPACE") {
 			var txt = pc_sprites.textboxes[selectedTextbox].text;
@@ -519,7 +557,7 @@ app.loader.load((loader, resources) => {
 			}
 		}
 	}
-	
+
 	function clearStage() {
 		for(var i = 0; i < pc_sprites.textboxes.length; i++)
 			pc_sprites.textboxes[i].destroy();
@@ -529,7 +567,7 @@ app.loader.load((loader, resources) => {
 		selectedTextbox = 0;
 		redraw = true;
 	}
-	
+
 	function isStageEmpty() {
 		for(var i = 0; i < pc_sprites.textboxes.length; i++)
 			if(pc_sprites.textboxes[i].text != "")
@@ -538,7 +576,7 @@ app.loader.load((loader, resources) => {
 			return false;
 		return true;
 	}
-	
+
 	function isPrevStageEmpty() {
 		for(var i = 0; i < prevTextboxes.length; i++)
 			if(prevTextboxes[i].text != "")
@@ -547,7 +585,7 @@ app.loader.load((loader, resources) => {
 			return false;
 		return true;
 	}
-	
+
 	function addInitialTextboxes() {
 		pc_sprites.textboxes = [];
 		pc_sprites.textboxes[0] = new PIXI.BitmapText("", ndsFont);
@@ -572,12 +610,12 @@ app.loader.load((loader, resources) => {
 		app.stage.addChild(pc_sprites.textboxes[4]);
 		scaleStage();
 	}
-	
+
 	function recordHistory(message) {
 		prevDrawHistory = message.drawing.slice();
 		prevTextboxes = message.textboxes.slice();
 	}
-	
+
 	function restoreHistory() {
 		console.log("Restoring History...", prevDrawHistory, prevTextboxes);
 		for(var i = 0; i < prevDrawHistory.length; i++) {
@@ -596,7 +634,7 @@ app.loader.load((loader, resources) => {
         scaleStage();
 		redraw = true;
 	}
-	
+
 	function generateMessageBox(messageRaw) {
         var message = {};
         message.lines = isNaN(messageRaw.lines) ? 1 : Math.max(1, Math.min(5, messageRaw.lines));
@@ -608,7 +646,7 @@ app.loader.load((loader, resources) => {
 		var box = new PIXI.Sprite(resources["box_bg" + message.lines].texture);
 		var box_lines = new PIXI.Sprite(resources["box_lines" + message.lines].texture);
 		var box_outline = new PIXI.Sprite(resources["box_outline" + message.lines].texture);
-		
+
 		container.box = box;
 		container.addChild(box);
 		container.addChild(box_lines);
@@ -617,14 +655,14 @@ app.loader.load((loader, resources) => {
 		box_lines.tint = increase_brightness(message.player.color, 75);
 		var height = (189 * SCALE - pc_sprites.scrollContainer.y) / SCALE + 4;
 		container.x = 0;
-		
-		
+
+
 		var ndsFont_msg = { font: '-16px NintendoDSBIOS', align: 'left', tint: message.player.color };
 		var box_name = new PIXI.BitmapText(message.player.name, ndsFont_msg);
 		box_name.x = 6;
 		box_name.y = 4;
 		container.addChild(box_name);
-		
+
 		var graphics = new PIXI.Graphics();
 		graphics.drawMode = 0;
         graphics.rainbowDeg = 0;
@@ -684,11 +722,11 @@ app.loader.load((loader, resources) => {
                 graphics.lineStyle(graphics.drawWidth + ((graphics.drawMode > 0) * (graphics.drawWidth == 2)), graphics.drawMode);
             }
 		}
-		
+
 		container.addChild(graphics);
 
         var ii = 0;
-		
+
 		for(var i = 0; i < message.textboxes.length; i++) {
 			var txt = message.textboxes[i];
             if (txt == null) continue;
@@ -706,14 +744,14 @@ app.loader.load((loader, resources) => {
 			container.addChild(tb);
             if (++ii > 255) break;
 		}
-		
+
 		pc_sprites.scrollContainer.addChild(container);
 		container.y = height;
 		scrollPos = pc_sprites.scrollContainer.children.length - 1;
 		scaleStage();
 		return container;
 	}
-	
+
 	function scrollMessages(amount) {
 		scrolling = true;
 		var finalScrollPos = pc_sprites.scrollContainer.y - amount * SCALE;
@@ -734,7 +772,7 @@ app.loader.load((loader, resources) => {
 			}
 		}, 1000/60);
 	}
-	
+
 	function scrollTo(index, speed) {
 		scrolling = false;
 		var box = pc_sprites.scrollContainer.children[index];
@@ -764,7 +802,7 @@ app.loader.load((loader, resources) => {
 
 	// Tell the server to join a room and send data about the client too
 	function joinRoom(roomId) {
-    joinedRoom = true;
+        joinedRoom = true;
 		// Bottom screen fade animation
 		sounds.join_room.play();
 		pc_sprites.roomBadge = PIXI.Sprite.from("images/letter_" + roomData.id + ".png");
@@ -772,13 +810,18 @@ app.loader.load((loader, resources) => {
 		pc_sprites.roomBadge.y = 192;
 		app.stage.addChildAt(pc_sprites.roomBadge, 2);
 		scaleStage();
+        roomDir = -1;
+        pc_sprites.roomScroll.scale.y = -roomDir * SCALE;
 		var fadeBSInterval = setInterval(function() {
 			for(var i = 0; i < pc_sprites.roomButtons.length; i++) {
 				pc_sprites.roomButtons[i].interactive = false;
 				pc_sprites.roomButtons[i].buttonMode = false;
 				pc_sprites.roomButtons[i].alpha -= 0.15;
-				pc_sprites.roomButtons[i].pcText.alpha -= 0.15;
+                if (pc_sprites.roomButtons[i].pcText != null) pc_sprites.roomButtons[i].pcText.alpha -= 0.15;
 			}
+            pc_sprites.roomScroll.alpha -= 0.15;
+            pc_sprites.roomScroll.interactive = false;
+            pc_sprites.roomScroll.buttonMode = false;
 			pc_sprites.choose.alpha -= 0.15;
 			if(pc_sprites.choose.alpha <= 0) {
 				clearInterval(fadeBSInterval);
@@ -803,10 +846,10 @@ app.loader.load((loader, resources) => {
 				}, 1000/30);
 			}
 		}, 1000/30);
-		
+
 		selectedTextbox = 0;
 	}
-	
+
 	function leaveRoom() {
     joinedRoom = false;
 		sounds.leave_room.play();
@@ -842,8 +885,11 @@ app.loader.load((loader, resources) => {
 						pc_sprites.roomButtons[i].interactive = true;
 						pc_sprites.roomButtons[i].buttonMode = true;
 						pc_sprites.roomButtons[i].alpha += 0.15;
-						pc_sprites.roomButtons[i].pcText.alpha += 0.15;
+                        if (pc_sprites.roomButtons[i].pcText != null) pc_sprites.roomButtons[i].pcText.alpha += 0.15;
 					}
+                    pc_sprites.roomScroll.interactive = true;
+                    pc_sprites.roomScroll.buttonMode = true;
+                    pc_sprites.roomScroll.alpha += 0.15;
 					pc_sprites.choose.alpha += 0.15;
 					if(pc_sprites.choose.alpha >= 1) {
 						clearInterval(fadeBSInterval);
@@ -851,7 +897,7 @@ app.loader.load((loader, resources) => {
 				}, 1000/30);
 			}
 		}, 1000/30);
-		
+
 		inRoom = false;
 	}
 
@@ -863,7 +909,7 @@ app.loader.load((loader, resources) => {
 				websocket.terminate();
 			}, 11000);
 		}
-		
+
 		websocket.onopen = function(event) {
 			console.log("WebSocket connection established.", event);
 			heartbeat();
@@ -884,7 +930,7 @@ app.loader.load((loader, resources) => {
 					}
 					case "sv_roomData": {
 						roomData = obj;
-						joinRoom(obj.id); 
+						joinRoom(obj.id);
 						break;
 					}
 					case "sv_error": {
@@ -979,18 +1025,18 @@ app.loader.load((loader, resources) => {
 						break;
 					}
 					default: {
-						
+
 					}
 				}
 			}
 		}
-		
+
 		websocket.onclose = function() {
 			connectionClosed();
 			clearTimeout(websocket.pingTimeout);
 		}
 	}
-	
+
 	function isMessageValid(message) {
 		var passed = false;
 		for(var i = 0; i < message.textboxes.length; i++) {
@@ -1003,7 +1049,7 @@ app.loader.load((loader, resources) => {
 		}
 		return passed;
 	}
-	
+
 	function connectionClosed() {
 		pc_sprites.connection.texture = resources["connection_bad"].texture;
 		for(var i = 0; i < app.stage.children.length; i++) {
@@ -1062,7 +1108,7 @@ app.loader.load((loader, resources) => {
 	app.stage.addChild(pc_sprites.choose);
 	pc_sprites.scrollContainer.addChild(pc_sprites.opening_message);
 	scrollPos = pc_sprites.scrollContainer.children.length - 1;
-	
+
 	pc_sprites.drawui.x = 0;
 	pc_sprites.drawui.y = 192;
 	pc_sprites.drawui.alpha = 0;
@@ -1083,7 +1129,7 @@ app.loader.load((loader, resources) => {
 	pc_sprites.box.interactive = true;
 	pc_sprites.box.on("pointerdown", function(event) {
 		inputFlag = true;
-		
+
 	});
 	pc_sprites.box.on("pointerup", function() {
 		if(this.alpha == 1) {
@@ -1092,7 +1138,7 @@ app.loader.load((loader, resources) => {
 			drawHistory.push(action);
 			redraw = true;
 		}
-		
+
 	});
 	pc_sprites.box.on("pointerupoutside", function() {
 		if(this.alpha == 1) {
@@ -1116,7 +1162,7 @@ app.loader.load((loader, resources) => {
 	app.stage.addChild(pc_sprites.drawing);
 	app.stage.addChild(pc_sprites.box_lines);
 	app.stage.addChild(pc_sprites.box_name);
-	
+
 	pc_sprites.drawWidthSelect = new PIXI.Sprite(pixel);
 	pc_sprites.drawWidthSelect.x = 2;
 	pc_sprites.drawWidthSelect.y = 263;
@@ -1126,7 +1172,7 @@ app.loader.load((loader, resources) => {
 	//pc_sprites.drawWidthSelect.blendMode = PIXI.BLEND_MODES.SCREEN;
 	pc_sprites.drawWidthSelect.alpha = 0;
 	app.stage.addChild(pc_sprites.drawWidthSelect);
-	
+
 	pc_sprites.drawModeSelect = new PIXI.Sprite(pixel);
 	pc_sprites.drawModeSelect.x = 2;
 	pc_sprites.drawModeSelect.y = 230;
@@ -1136,20 +1182,20 @@ app.loader.load((loader, resources) => {
 	//pc_sprites.drawModeSelect.blendMode = PIXI.BLEND_MODES.SCREEN;
 	pc_sprites.drawModeSelect.alpha = 0;
 	app.stage.addChild(pc_sprites.drawModeSelect);
-	
+
 	addInitialTextboxes();
-	
+
 	app.stage.addChild(draggedTb);
-	
 
 
 
 
-	
+
+
 	scaleStage();
 	setupWebSocket();
 	scrollMessages(pc_sprites.opening_message.height - 2);
-	
+
 	app.renderer.plugins.interaction.on('pointermove', function(event) {
 		mousePos.x = event.data.global.x / SCALE;
 		mousePos.y = event.data.global.y / SCALE;
@@ -1172,12 +1218,12 @@ app.loader.load((loader, resources) => {
 		mousePos.x = event.data.global.x / SCALE;
 		mousePos.y = event.data.global.y / SCALE;
 	});
-	
+
 	function emptyQueue() {
 		drawHistory = drawHistory.concat(drawQueue);
 		drawQueue = [];
 	}
-	
+
 	var drawSound;
 	app.ticker.add((delta) => {
 		if(isDrawing) {
@@ -1190,7 +1236,7 @@ app.loader.load((loader, resources) => {
 					lastAction = action;
 					redraw = true;
 				}
-				
+
 				var distanceBetween = Math.sqrt((lastAction.x - mousePos.x)*(lastAction.x - mousePos.x)+(lastAction.y - mousePos.y)*(lastAction.y - mousePos.y));
 				sounds.draw.volume(distanceBetween / 2.0, drawSound);
 				if(distanceBetween >= 2) {
@@ -1211,10 +1257,10 @@ app.loader.load((loader, resources) => {
 		} else {
 			sounds.draw.stop(drawSound);
 		}
-		
+
 		draggedTb.x = (mousePos.x + dragOffset.x) * SCALE;
 		draggedTb.y = (mousePos.y + dragOffset.y) * SCALE;
-		
+
 		if(redraw) drawDrawing();
 	});
 
@@ -1291,7 +1337,7 @@ function scaleStage() {
 		stageChildren[i].scale.x *= SCALE;
 		stageChildren[i].scale.y *= SCALE;
 	}
-	
+
 	document.getElementById("root").style.width = app.view.width;
 	document.getElementById("root").style.height = app.view.height;
 	document.getElementById("intro").style.width = app.view.width;

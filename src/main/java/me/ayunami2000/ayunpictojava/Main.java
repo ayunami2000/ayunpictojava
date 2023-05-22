@@ -202,8 +202,10 @@ public class Main {
                 return USERS_B;
             case "room_c":
                 return USERS_C;
-            case "room_d":
-                return USERS_D;
+			case "room_d":
+				return USERS_D;
+			case "room_e":
+				return USERS_A;
             default:
                 return null;
         }
@@ -224,6 +226,7 @@ public class Main {
         } else {
             try {
                 Files.write(BANFILE.toPath(), Collections.singleton("[]"), StandardCharsets.UTF_8);
+				banList = new JsonArray();
             } catch (IOException e) {
                 e.printStackTrace();
                 System.exit(1);
@@ -534,7 +537,7 @@ public class Main {
                     }
                     Map<JsonObject, ChannelHandlerContext> USERS = getUsersForRoomId(cmd[2]);
                     if (USERS == null) {
-                        System.out.println("Invalid room! Please specify one of: \"room_a\" ; \"room_b\" ; \"room_c\" ; \"room_d\"");
+                        System.out.println("Invalid room! Please specify one of: \"room_a\" ; \"room_b\" ; \"room_c\" ; \"room_d\" ; \"room_e\"");
                         break;
                     }
                     USERS = new HashMap<>(USERS);
@@ -833,7 +836,8 @@ public class Main {
                     tmp.add("room_a");
                     tmp.add("room_b");
                     tmp.add("room_c");
-                    tmp.add("room_d");
+					tmp.add("room_d");
+					tmp.add("room_e");
                     res.add("ids", tmp);
                     ctx.writeAndFlush(res);
                     break;
@@ -1285,6 +1289,8 @@ public class Main {
                     return channel3;
                 case "room_d":
                     return channel4;
+				case "room_e":
+					return channel1;
                 default:
                     return null;
             }
