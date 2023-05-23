@@ -1046,7 +1046,7 @@ public class Main {
 							jsonObject.add("message", message);
 							ctx.writeAndFlush(jsonObject);
 						} else if (textRaw.toLowerCase().startsWith("!join ")) {
-							String privRoomId = textRaw.substring(6, Math.min(12, textRaw.length())).toUpperCase();
+							String privRoomId = textRaw.replace("\n", "").substring(6, Math.min(12, textRaw.length())).toUpperCase();
 							if (ROOM_CODES.containsKey(privRoomId)) {
 								if (privRoomId.equals(ctx.channel().attr(PRIVATE_ROOM).get())) {
 									jsonObject = new JsonObject();
