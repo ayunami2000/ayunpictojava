@@ -196,7 +196,7 @@ app.loader.load((loader, resources) => {
                     pc_sprites.roomScroll.interactive = true;
                     pc_sprites.roomScroll.buttonMode = true;
                     for (var i = 0; i < pc_sprites.roomButtons.length; i++) {
-                        pc_sprites.roomButtons[i].interactive = roomDir > 0 ? (i > 3) : (i < 4);
+                        pc_sprites.roomButtons[i].interactive = pc_sprites.roomButtons[i].buttonMode = roomDir > 0 ? (i >= pc_sprites.roomButtons.length - 4) : (i < 4);
                     }
                 }
             }, 1000/60);
@@ -882,8 +882,10 @@ app.loader.load((loader, resources) => {
 				}
 				var fadeBSInterval = setInterval(function() {
 					for(var i = 0; i < pc_sprites.roomButtons.length; i++) {
-						pc_sprites.roomButtons[i].interactive = true;
-						pc_sprites.roomButtons[i].buttonMode = true;
+                        if (i < 4) {
+                            pc_sprites.roomButtons[i].interactive = true;
+                            pc_sprites.roomButtons[i].buttonMode = true;
+                        }
 						pc_sprites.roomButtons[i].alpha += 0.15;
                         if (pc_sprites.roomButtons[i].pcText != null) pc_sprites.roomButtons[i].pcText.alpha += 0.15;
 					}
