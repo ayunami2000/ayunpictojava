@@ -753,6 +753,7 @@ app.loader.load((loader, resources) => {
 	}
 
 	function scrollMessages(amount) {
+        toggleScrollBtns(false);
 		scrolling = true;
 		var finalScrollPos = pc_sprites.scrollContainer.y - amount * SCALE;
 		var childrenLength = pc_sprites.scrollContainer.children.length - 1;
@@ -763,21 +764,28 @@ app.loader.load((loader, resources) => {
 					clearInterval(interval);
 					pc_sprites.scrollContainer.y = finalScrollPos;
 					scrolling = false;
+                    toggleScrollBtns(true);
 				}
 				pc_sprites.scrollContainer.origy = pc_sprites.scrollContainer.y / SCALE;
 			} else {
 				clearInterval(interval);
 				scrollPos = childrenLength;
+                toggleScrollBtns(true);
 				scrollTo(scrollPos, -1);
 			}
 		}, 1000/60);
 	}
+
+    function toggleScrollBtns(usable) {
+        if (scrollUpBtn != null && scrollDownBtn != null) scrollUpBtn.interactive = scrollUpBtn.buttonMode = scrollDownBtn.interactive = scrollDownBtn.buttonMode = usable;
+    }
 
 	function scrollTo(index, speed) {
 		scrolling = false;
 		var box = pc_sprites.scrollContainer.children[index];
 		var targetY = (191 - box.y - box.height) * SCALE;
 		if(speed > 0) {
+            toggleScrollBtns(false);
 			var direction = (targetY - pc_sprites.scrollContainer.y) > 0 ? 1 : -1;
 			var interval = setInterval(function() {
 				pc_sprites.scrollContainer.y += 4 * SCALE * direction * speed;
@@ -785,11 +793,13 @@ app.loader.load((loader, resources) => {
 					if(pc_sprites.scrollContainer.y >= targetY) {
 						clearInterval(interval);
 						pc_sprites.scrollContainer.y = targetY;
+                        toggleScrollBtns(true);
 					}
 				} else {
 					if(pc_sprites.scrollContainer.y <= targetY) {
 						clearInterval(interval);
 						pc_sprites.scrollContainer.y = targetY;
+                        toggleScrollBtns(true);
 					}
 				}
 				pc_sprites.scrollContainer.origy = pc_sprites.scrollContainer.y / SCALE;
