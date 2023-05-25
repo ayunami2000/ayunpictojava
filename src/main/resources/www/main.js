@@ -41,7 +41,23 @@ sounds.receive = new Howl({ src: ['sounds/receive.mp3'] });
 PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
 
 app.stage.sortableChildren = true;
-app.loader.add('nds', 'nds.fnt');
+var loaderFunc = function() {};
+(new FontFaceObserver('nds')).load().then(function () {
+    PIXI.BitmapFont.from('NintendoDSBIOS', {
+        fontSize: 40,
+        lineHeight: 48,
+        fontFamily: 'nds',
+        fill: 0xFFFFFF,
+    }, {
+        scaleMode: PIXI.SCALE_MODES.NEAREST,
+        mipmap: PIXI.MIPMAP_MODES.OFF,
+        chars: " 1234567890-=qwertyuiopasdfghjklzxcvbnm,./;’[]!@#$%^&*()_+QWERTYUIOPASDFGHJKLZXCVBNM<>?:~{}àáâäèéêëìíîïòóôöœùúûüçñßÀÁÂÄÈÉÊËÌÍÎÏÒÓÔÖŒÙÚÛÜÇÑ¡¿€¢£″'⁓~+×÷→←↑↓「」“”()<>{}•♨〒♭♪±\\°|／＼∞∴…™©®☸☹☺☻☼☁☂☃✉☎☄☰☱☲☳☴☵✜♠♦♥♣☶☷✫✲◇□△▽◎➔➕➖➗✬✱◆■▲▼✕"
+    });
+    app.loader.load(loaderFunc);
+}, function () {
+    console.log('Font is not available');
+});
+
 for(var i = 1; i < 6; i++) {
 	app.loader.add('box_bg' + i, 'images/box_bg' + i + '.png');
 	app.loader.add('box_outline' + i, 'images/box_outline' + i + '.png');
@@ -59,7 +75,7 @@ app.loader.add('leave_room_c', 'images/leave_room_c.png');
 app.loader.add('leave_room_d', 'images/leave_room_d.png');
 app.loader.add('leave_room_e', 'images/leave_room_e.png');
 app.loader.add('connection_bad', 'images/connection_bad.png');
-app.loader.load((loader, resources) => {
+loaderFunc = (loader, resources) => {
 	websocket = new WebSocket("ws"+window.location.href.slice(4));
 
 	document.getElementById("root").appendChild(app.view);
@@ -67,9 +83,9 @@ app.loader.load((loader, resources) => {
 
 
 
-	var ndsFont = { font: '-16px NintendoDSBIOS', align: 'center', tint: 0 };
-	var ndsFont_name = { font: '-16px NintendoDSBIOS', align: 'left', tint: playerData.color };
-	var ndsFont_jl = { font: '-16px NintendoDSBIOS', align: 'left', tint: 0xd3cbc3 };
+	var ndsFont = { font: '10px NintendoDSBIOS', align: 'center', tint: 0 };
+	var ndsFont_name = { font: '10px NintendoDSBIOS', align: 'left', tint: playerData.color };
+	var ndsFont_jl = { font: '10px NintendoDSBIOS', align: 'left', tint: 0xd3cbc3 };
 	const pixel = PIXI.Texture.from("images/pixel.png");
 	var redraw = false;
 	var draggedTb = new PIXI.BitmapText("", ndsFont);
@@ -84,6 +100,10 @@ app.loader.load((loader, resources) => {
 	const keys_NORMAL = ["1","2","3","4","5","6","7","8","9","0","-","=","q","w","e","r","t","y","u","i","o","p","BACKSPACE","CAPS","a","s","d","f","g","h","j","k","l","ENTER","SHIFT","z","x","c","v","b","n","m",",",".","/",";","\'"," ","[","]"];
 	const keys_CAPS = ["1","2","3","4","5","6","7","8","9","0","-","=","Q","W","E","R","T","Y","U","I","O","P","BACKSPACE","CAPS","A","S","D","F","G","H","J","K","L","ENTER","SHIFT","Z","X","C","V","B","N","M",",",".","/",";","\'"," ","[","]"];
 	const keys_SHIFT = ["!","@","#","$","%","^","&","*","(",")","_","+","Q","W","E","R","T","Y","U","I","O","P","BACKSPACE","CAPS","A","S","D","F","G","H","J","K","L","ENTER","SHIFT","Z","X","C","V","B","N","M","<",">","?",":","~"," ","{","}"];
+    const keys_ACCENTS = [" ","ENTER","BACKSPACE","à","ï","ñ","Í","Ü","á","â","ä","è","é","ê","ë","ì","í","î","ò","ó","ô","ö","œ","ù","ú","û","ü","ç","ß","À","Á","Â","Ä","È","É","Ê","Ë","Ì","Î","Ï","Ò","Ó","Ô","Ö","Œ","Ù","Ú","Û","Ç","Ñ","¡","¿","€","¢","£"];
+    const keys_JAPANESE = [" ","ENTER","BACKSPACE","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP","WIP"];
+    const keys_SYMBOLS = [" ","ENTER","BACKSPACE","!","+","「","%","^","?","&","″","'","⁓",":",";","@","~","_","-","*","/","×","÷","=","→","←","↑","↓","」","“","”","(",")","<",">","{","}","•","♨","〒","#","♭","♪","±","$","¢","£","\\","°","|","／","＼","∞","∴","…","™","©","®"];
+    const keys_EMOJIS = [" ","ENTER","BACKSPACE","1","☸","☰","☶","➔","2","3","4","5","6","7","8","9","0","=","☹","☺","☻","☼","☁","☂","☃","✉","☎","☄","☱","☲","☳","☴","☵","✜","♠","♦","♥","♣","☷","+","-","✫","✲","◇","□","△","▽","◎","➕","➖","➗","✬","✱","◆","■","▲","▼","✕"];
   var joinedRoom = false;
 
   window.onkeydown=function(e){
@@ -120,6 +140,14 @@ app.loader.load((loader, resources) => {
           } else {
               eraserBtn.emit("pointerup");
           }
+      } else if (key == "Tab") {
+          e.preventDefault();
+          if (kbMode < 3) {
+              kbMode = 3;
+          } else {
+              kbMode = (kbMode + 1) % 7;
+          }
+          updKb();
       } else if (key == "ArrowLeft" || key == "PageUp") {
 		  scrollUpBtn.emit("pointerup");
 	  } else if (key == "ArrowRight" || key == "PageDown") {
@@ -184,12 +212,12 @@ app.loader.load((loader, resources) => {
             pc_sprites.roomScroll.buttonMode = false;
             var o = 0;
             var int = setInterval(function() {
-                if (o > 20) return;
+                if (o > 8) return;
                 for (var i = 0; i < pc_sprites.roomButtons.length; i++) {
-                    pc_sprites.roomButtons[i].y += 4 * roomDir;
-                    if (pc_sprites.roomButtons[i].pcText != null) pc_sprites.roomButtons[i].pcText.y += 4 * roomDir;
+                    pc_sprites.roomButtons[i].y += 4 * SCALE * roomDir;
+                    if (pc_sprites.roomButtons[i].pcText != null) pc_sprites.roomButtons[i].pcText.y += 4 * SCALE * roomDir;
                 }
-                if (++o >= 20 * (pc_sprites.roomButtons.length - 4)) {
+                if (++o >= 8 * (pc_sprites.roomButtons.length - 4)) {
                     clearInterval(int);
                     roomDir = -roomDir;
                     pc_sprites.roomScroll.scale.y = -roomDir * SCALE;
@@ -206,53 +234,89 @@ app.loader.load((loader, resources) => {
 	}
 
 	function generateStageButtons() {
+        pc_sprites.kb_normal = [];
+
 		var stageButtons = [];
 		var keyIndex = 0;
 
 		// 1-=
 		for(var i = 0; i < 12; i++) {
-			createKbButton(26 + 16 * i, 297, 15, 14, keyIndex);
+            pc_sprites.kb_normal.push(createKbButton(26 + 16 * i, 297, 15, 14, keyIndex));
 			keyIndex++;
 		}
 		// q-p
 		for(var i = 0; i < 10; i++) {
-			createKbButton(35 + 16 * i, 312, 15, 15, keyIndex);
+            pc_sprites.kb_normal.push(createKbButton(35 + 16 * i, 312, 15, 15, keyIndex));
 			keyIndex++;
 		}
 		// BACKSPACE
-		createKbButton(195, 312, 25, 15, keyIndex);
+        pc_sprites.kb_normal.push(createKbButton(195, 312, 25, 15, keyIndex));
 		keyIndex++;
 		// CAPS-l
 		for(var i = 0; i < 10; i++) {
-			createKbButton(26 + 16 * i, 328, 15, 15, keyIndex);
+            pc_sprites.kb_normal.push(createKbButton(26 + 16 * i, 328, 15, 15, keyIndex));
 			keyIndex++;
 		}
 		// ENTER
-		createKbButton(186, 328, 34, 15, keyIndex);
+        pc_sprites.kb_normal.push(createKbButton(186, 328, 34, 15, keyIndex));
 		keyIndex++;
 		// SHIFT
-		createKbButton(24, 344, 25, 15, keyIndex);
+        pc_sprites.kb_normal.push(createKbButton(24, 344, 25, 15, keyIndex));
 		keyIndex++;
 		// z-/
 		for(var i = 0; i < 10; i++) {
-			createKbButton(50 + 16 * i, 344, 15, 15, keyIndex);
+            pc_sprites.kb_normal.push(createKbButton(50 + 16 * i, 344, 15, 15, keyIndex));
 			keyIndex++;
 		}
 		// ;
-		createKbButton(58, 360, 15, 14, keyIndex);
+        pc_sprites.kb_normal.push(createKbButton(58, 360, 15, 14, keyIndex));
 		keyIndex++;
 		// '
-		createKbButton(74, 360, 15, 14, keyIndex);
+        pc_sprites.kb_normal.push(createKbButton(74, 360, 15, 14, keyIndex));
 		keyIndex++;
 		// SPACE
-		createKbButton(90, 360, 79, 14, keyIndex);
+        pc_sprites.kb_normal.push(createKbButton(90, 360, 79, 14, keyIndex));
 		keyIndex++;
 		// [
-		createKbButton(170, 360, 15, 14, keyIndex);
+        pc_sprites.kb_normal.push(createKbButton(170, 360, 15, 14, keyIndex));
 		keyIndex++;
 		// ]
-		createKbButton(186, 360, 15, 14, keyIndex);
+        pc_sprites.kb_normal.push(createKbButton(186, 360, 15, 14, keyIndex));
 		keyIndex++;
+
+        pc_sprites.kb_abnormal = [];
+        pc_sprites.kb_abnormal_lastThree = [];
+
+        keyIndex = 0;
+
+        // space
+        pc_sprites.kb_abnormal.push(createKbButton(202, 360, 18, 15, keyIndex));
+        keyIndex++;
+        // enter
+        pc_sprites.kb_abnormal.push(createKbButton(202, 328, 18, 31, keyIndex));
+        keyIndex++;
+        // backspace
+        pc_sprites.kb_abnormal.push(createKbButton(202, 312, 18, 15, keyIndex));
+        keyIndex++;
+
+        // left side
+        for (var i = 0; i < 5; i++) {
+            pc_sprites.kb_abnormal.push(createKbButton(24, 296 + 16 * i, 17, 15, keyIndex));
+            keyIndex++;
+        }
+
+        // the rest
+        for (var i = 0; i < 50; i++) {
+            pc_sprites.kb_abnormal.push(createKbButton(42 + 16 * (i % 10), 296 + 16 * Math.floor(i / 10), 15, 15, keyIndex));
+            keyIndex++;
+            if (i > 46) pc_sprites.kb_abnormal_lastThree.push(pc_sprites.kb_abnormal[pc_sprites.kb_abnormal.length - 1]);
+        }
+
+        pc_sprites.kb_abnormal.push(createKbButton(202, 296, 18, 15, keyIndex));
+        keyIndex++;
+        pc_sprites.kb_abnormal_strayJapanese = pc_sprites.kb_abnormal[pc_sprites.kb_abnormal.length - 1];
+
+        updKb();
 
 		sendBtn = createStageButton(225, 296, 31, 30, "SEND");
 		renewBtn = createStageButton(225, 327, 31, 23, "RENEW");
@@ -269,8 +333,46 @@ app.loader.load((loader, resources) => {
 
 		createStageButton(245, 193, 10, 10, "EXIT");
 
+        pc_sprites.kb_btn_normal = createStageButton(2, 299, 14, 14, "KB_NORMAL");
+        pc_sprites.kb_btn_accents = createStageButton(2, 316, 14, 14, "KB_ACCENTS");
+        pc_sprites.kb_btn_japanese = createStageButton(2, 333, 14, 14, "KB_JAPANESE");
+        pc_sprites.kb_btn_symbols = createStageButton(2, 350, 14, 14, "KB_SYMBOLS");
+        pc_sprites.kb_btn_emojis = createStageButton(2, 367, 14, 14, "KB_EMOJIS");
+
 		scaleStage();
 	}
+
+    function updKb() {
+        for (var i = 0; i < pc_sprites.kb_normal.length; i++) pc_sprites.kb_normal[i].interactive = pc_sprites.kb_normal[i].buttonMode = kbMode < 3;
+        for (var i = 0; i < pc_sprites.kb_abnormal.length; i++) pc_sprites.kb_abnormal[i].interactive = pc_sprites.kb_abnormal[i].buttonMode = kbMode > 2;
+        if (kbMode == 3) {
+            for (var i = 0; i < pc_sprites.kb_abnormal_lastThree.length; i++) pc_sprites.kb_abnormal_lastThree[i].interactive = pc_sprites.kb_abnormal_lastThree[i].buttonMode = false;
+        }
+        if (kbMode != 4) pc_sprites.kb_abnormal_strayJapanese.interactive = pc_sprites.kb_abnormal_strayJapanese.buttonMode = false;
+        pc_sprites.shift.alpha = pc_sprites.caps.alpha = pc_sprites.accents.alpha = pc_sprites.symbols.alpha = pc_sprites.japanese.alpha = pc_sprites.emojis.alpha = 0;
+        switch (kbMode) {
+            case 0:
+                break;
+            case 1:
+                pc_sprites.shift.alpha = 1;
+                break;
+            case 2:
+                pc_sprites.caps.alpha = 1;
+                break;
+            case 3:
+                pc_sprites.accents.alpha = 1;
+                break;
+            case 4:
+                pc_sprites.japanese.alpha = 1;
+                break;
+            case 5:
+                pc_sprites.symbols.alpha = 1;
+                break;
+            case 6:
+                pc_sprites.emojis.alpha = 1;
+                break;
+        }
+    }
 
 	function createKbButton(x, y, w, h, keyIndex) {
 		var sb = new PIXI.Sprite(pixel);
@@ -291,14 +393,14 @@ app.loader.load((loader, resources) => {
 			sounds.key_down.play();
 		});
 		sb.on('pointerup', function() {
-			addCharacter(this.keyIndex);
-			this.draggingState = 0;
-			draggedTb.text = "";
-			this.alpha = 0;
-			if(kbMode == 1 && this.keyIndex != 34) {
-				kbMode = 0;
-				pc_sprites.shift.alpha = 0;
-			}
+            addCharacter(this.keyIndex);
+            this.draggingState = 0;
+            draggedTb.text = "";
+            this.alpha = 0;
+            if (kbMode == 1 && this.keyIndex != 34) {
+                kbMode = 0;
+                pc_sprites.shift.alpha = 0;
+            }
 			sounds.key_up.play();
 		});
 		sb.on('pointerupoutside', function() {
@@ -438,10 +540,42 @@ app.loader.load((loader, resources) => {
 					leaveRoom();
 					break;
 				}
+                case "KB_NORMAL": {
+                    sounds.scroll.play();
+                    kbMode = 0;
+                    updKb();
+                    pc_sprites.keyboardSelect.y = 299 * SCALE;
+                    break;
+                }
+                case "KB_ACCENTS": {
+                    sounds.scroll.play();
+                    kbMode = 3;
+                    updKb();
+                    pc_sprites.keyboardSelect.y = 316 * SCALE;
+                    break;
+                }
+                case "KB_JAPANESE": {
+                    sounds.scroll.play();
+                    kbMode = 4;
+                    updKb();
+                    pc_sprites.keyboardSelect.y = 333 * SCALE;
+                    break;
+                }
+                case "KB_SYMBOLS": {
+                    sounds.scroll.play();
+                    kbMode = 5;
+                    updKb();
+                    pc_sprites.keyboardSelect.y = 350 * SCALE;
+                    break;
+                }
+                case "KB_EMOJIS": {
+                    sounds.scroll.play();
+                    kbMode = 6;
+                    updKb();
+                    pc_sprites.keyboardSelect.y = 367 * SCALE;
+                    break;
+                }
 			}
-            if (!rainbowPenMode) {
-
-            }
 		}
 
 		var sb = new PIXI.Sprite(pixel);
@@ -478,6 +612,14 @@ app.loader.load((loader, resources) => {
 				keys = keys_SHIFT; break;
 			case 2:
 				keys = keys_CAPS; break;
+            case 3:
+                keys = keys_ACCENTS; break;
+            case 4:
+                keys = keys_JAPANESE; break;
+            case 5:
+                keys = keys_SYMBOLS; break;
+            case 6:
+                keys = keys_EMOJIS; break;
 		}
 		return keys[keyIndex];
 	}
@@ -500,25 +642,29 @@ app.loader.load((loader, resources) => {
 				}
 			}
 		} else if(key == "SHIFT") {
-			if(kbMode != 1) {
-				pc_sprites.shift.alpha = 1;
-				pc_sprites.caps.alpha = 0;
-				kbMode = 1;
-			} else {
-				pc_sprites.shift.alpha = 0;
-				pc_sprites.caps.alpha = 0;
-				kbMode = 0;
-			}
+            if (kbMode < 3) {
+                if (kbMode != 1) {
+                    pc_sprites.shift.alpha = 1;
+                    pc_sprites.caps.alpha = 0;
+                    kbMode = 1;
+                } else {
+                    pc_sprites.shift.alpha = 0;
+                    pc_sprites.caps.alpha = 0;
+                    kbMode = 0;
+                }
+            }
 		} else if(key == "CAPS") {
-			if(kbMode != 2) {
-				pc_sprites.shift.alpha = 0;
-				pc_sprites.caps.alpha = 1;
-				kbMode = 2;
-			} else {
-				pc_sprites.shift.alpha = 0;
-				pc_sprites.caps.alpha = 0;
-				kbMode = 0;
-			}
+            if (kbMode < 3) {
+                if (kbMode != 2) {
+                    pc_sprites.shift.alpha = 0;
+                    pc_sprites.caps.alpha = 1;
+                    kbMode = 2;
+                } else {
+                    pc_sprites.shift.alpha = 0;
+                    pc_sprites.caps.alpha = 0;
+                    kbMode = 0;
+                }
+            }
 		} else if(key == "ENTER") {
 			if(selectedTextbox < 4) {
 				selectedTextbox++;
@@ -657,7 +803,7 @@ app.loader.load((loader, resources) => {
 		container.x = 0;
 
 
-		var ndsFont_msg = { font: '-16px NintendoDSBIOS', align: 'left', tint: message.player.color };
+		var ndsFont_msg = { font: '10px NintendoDSBIOS', align: 'left', tint: message.player.color };
 		var box_name = new PIXI.BitmapText(message.player.name, ndsFont_msg);
 		box_name.x = 6;
 		box_name.y = 4;
@@ -844,6 +990,7 @@ app.loader.load((loader, resources) => {
 					pc_sprites.box_lines.alpha += 0.2;
 					pc_sprites.drawWidthSelect.alpha += 0.1;
 					pc_sprites.drawModeSelect.alpha += 0.1;
+                    pc_sprites.keyboardSelect.alpha += 0.1;
 					if(pc_sprites.box.alpha >= 1) {
 						clearInterval(fadeDrawIn);
 						pc_sprites.connection.origy = 1;
@@ -864,6 +1011,8 @@ app.loader.load((loader, resources) => {
     joinedRoom = false;
 		sounds.leave_room.play();
 		clearStage();
+        kbMode = 0;
+        updKb();
 		var fadeDrawIn = setInterval(function() {
 			pc_sprites.connection.y = lerp(1, -16, (1-pc_sprites.box.alpha)) * SCALE;
 			pc_sprites.roomBadge.y = lerp(175, 192, (1-pc_sprites.box.alpha)) * SCALE;
@@ -873,6 +1022,7 @@ app.loader.load((loader, resources) => {
 			pc_sprites.box_lines.alpha -= 0.2;
 			pc_sprites.drawWidthSelect.alpha -= 0.1;
 			pc_sprites.drawModeSelect.alpha -= 0.1;
+            pc_sprites.keyboardSelect.alpha -= 0.1;
 			if(pc_sprites.box.alpha <= 0) {
 				clearInterval(fadeDrawIn);
 				pc_sprites.connection.origy = -16 * SCALE;
@@ -1087,7 +1237,11 @@ app.loader.load((loader, resources) => {
 	pc_sprites.drawui = PIXI.Sprite.from("images/drawui.png");
 	pc_sprites.box = PIXI.Sprite.from("images/box_bg5.png");
 	pc_sprites.shift = PIXI.Sprite.from("images/shift.png");
-	pc_sprites.caps = PIXI.Sprite.from("images/caps.png");
+    pc_sprites.caps = PIXI.Sprite.from("images/caps.png");
+    pc_sprites.accents = PIXI.Sprite.from("images/accents.png");
+    pc_sprites.symbols = PIXI.Sprite.from("images/symbols.png");
+    pc_sprites.japanese = PIXI.Sprite.from("images/japanese.png");
+    pc_sprites.emojis = PIXI.Sprite.from("images/emojis.png");
 	pc_sprites.box_lines = PIXI.Sprite.from("images/box_lines.png");
 	pc_sprites.box_outline = PIXI.Sprite.from("images/box_outline5.png");
 	pc_sprites.opening_message = new PIXI.Sprite(resources["opening_message"].texture);
@@ -1129,10 +1283,26 @@ app.loader.load((loader, resources) => {
 	pc_sprites.shift.y = 192;
 	pc_sprites.shift.alpha = 0;
 	app.stage.addChild(pc_sprites.shift);
-	pc_sprites.caps.x = 0;
-	pc_sprites.caps.y = 192;
-	pc_sprites.caps.alpha = 0;
-	app.stage.addChild(pc_sprites.caps);
+    pc_sprites.caps.x = 0;
+    pc_sprites.caps.y = 192;
+    pc_sprites.caps.alpha = 0;
+    app.stage.addChild(pc_sprites.caps);
+    pc_sprites.accents.x = 0;
+    pc_sprites.accents.y = 192;
+    pc_sprites.accents.alpha = 0;
+    app.stage.addChild(pc_sprites.accents);
+    pc_sprites.symbols.x = 0;
+    pc_sprites.symbols.y = 192;
+    pc_sprites.symbols.alpha = 0;
+    app.stage.addChild(pc_sprites.symbols);
+    pc_sprites.japanese.x = 0;
+    pc_sprites.japanese.y = 192;
+    pc_sprites.japanese.alpha = 0;
+    app.stage.addChild(pc_sprites.japanese);
+    pc_sprites.emojis.x = 0;
+    pc_sprites.emojis.y = 192;
+    pc_sprites.emojis.alpha = 0;
+    app.stage.addChild(pc_sprites.emojis);
 	pc_sprites.box_outline.tint = playerData.color;
 	pc_sprites.box_lines.tint = increase_brightness(playerData.color, 75);
 	pc_sprites.box.x = 21;
@@ -1194,6 +1364,15 @@ app.loader.load((loader, resources) => {
 	//pc_sprites.drawModeSelect.blendMode = PIXI.BLEND_MODES.SCREEN;
 	pc_sprites.drawModeSelect.alpha = 0;
 	app.stage.addChild(pc_sprites.drawModeSelect);
+
+    pc_sprites.keyboardSelect = new PIXI.Sprite(pixel);
+    pc_sprites.keyboardSelect.x = 2;
+    pc_sprites.keyboardSelect.y = 299;
+    pc_sprites.keyboardSelect.scale.x = 14;
+    pc_sprites.keyboardSelect.scale.y = 14;
+    pc_sprites.keyboardSelect.tint = playerData.color;
+    pc_sprites.keyboardSelect.alpha = 0;
+    app.stage.addChild(pc_sprites.keyboardSelect);
 
 	addInitialTextboxes();
 
@@ -1325,7 +1504,7 @@ app.loader.load((loader, resources) => {
 		}
 		redraw = false;
 	}
-});
+};
 
 function scaleStage() {
 	// Scale stage by SCALE amount
@@ -1373,6 +1552,7 @@ function updatePlayerData() {
 	pc_sprites.box_lines.tint = increase_brightness(playerData.color, 75);
 	pc_sprites.drawWidthSelect.tint = playerData.color;
 	pc_sprites.drawModeSelect.tint = playerData.color;
+    pc_sprites.keyboardSelect.tint = playerData.color;
 	pc_sprites.choose_mask.tint = playerData.color;
 	for(var i = 0; i < app.stage.children.length; i++) {
 		if(app.stage.children[i].spriteType == "kb")
