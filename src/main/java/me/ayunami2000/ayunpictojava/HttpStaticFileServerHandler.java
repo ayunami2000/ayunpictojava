@@ -350,7 +350,7 @@ public class HttpStaticFileServerHandler extends SimpleChannelInboundHandler<Ful
         } catch (IOException ignored) {
         }
         if (mimeType == null) mimeType = "application/octet-stream";
-		if (mimeType.startsWith("text/")) mimeType += ";charset=utf-8";
+		if (mimeType.startsWith("text/") || mimeType.endsWith("/javascript")) mimeType += "; charset=utf-8";
         response.headers().set(HttpHeaderNames.CONTENT_TYPE, mimeType);
     }
 }
