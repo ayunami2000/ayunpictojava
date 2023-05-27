@@ -15,6 +15,10 @@ var emitter = new PIXI.utils.EventEmitter();
 
 var mousePos = { x: 0, y: 0 };
 
+var joinedRoom = false;
+
+var topyElem = document.getElementById("topy");
+
 var sounds = [];
 sounds.start_app = new Howl({ src: ['sounds/start_app.mp3'] });
 sounds.join_room = new Howl({ src: ['sounds/join_room.mp3'] });
@@ -110,12 +114,13 @@ loaderFunc = (loader, resources) => {
     const keys_SYMBOLS = [" ","ENTER","BACKSPACE","!","+","「","%","^","?","&","″","'","⁓",":",";","@","~","_","-","*","/","×","÷","=","→","←","↑","↓","」","“","”","(",")","<",">","{","}","•","♨","〒","#","♭","♪","±","$","¢","£","\\","°","|","／","＼","∞","∴","…","™","©","®"];
     const keys_EMOJIS = [" ","ENTER","BACKSPACE","1","☸","☰","☶","➔","2","3","4","5","6","7","8","9","0","=","☹","☺","☻","☼","☁","☂","☃","✉","☎","☄","☱","☲","☳","☴","☵","✜","♠","♦","♥","♣","☷","+","-","✫","✲","◇","□","△","▽","◎","➕","➖","➗","✬","✱","◆","■","▲","▼","✕"];
     const jpModChars = ["がざだばぎじぢびぐずづぶげぜでべごぞどぼガザダバギジヂビヴグズヅブゲゼデベゴゾドボ".split(""),"ぱぴぷぺぽパピプペポ".split(""),"ぁゃゎぃゅぅっょぇぉァヵャヮィュゥッョェヶォ".split("")];
-  var joinedRoom = false;
 
-  window.onkeydown=function(e){
-    if(joinedRoom){
-      sounds.key_down.play();
-    }
+  topyElem.onkeydown = function(e) {
+      if (joinedRoom) sounds.key_down.play();
+  };
+
+  window.onkeydown = function(e) {
+      if (e.target != topyElem) topyElem.onkeydown(e);
   };
 
   var sendBtn, renewBtn, bigPenBtn, smallPenBtn, penBtn, eraserBtn, scrollUpBtn, scrollDownBtn, clearBtn;
@@ -124,45 +129,89 @@ loaderFunc = (loader, resources) => {
 	  bigPenMode = true,
       rainbowPenMode = false;
 
-  window.onkeyup=function(e){
-    if(joinedRoom){
-      const key = e.key.replace("Backspace","BACKSPACE").replace("Enter","ENTER");
-      if(key!="Shift"&&key!="CapsLock"&&(keys_NORMAL.includes(key)||keys_CAPS.includes(key)||keys_SHIFT.includes(key)))addCharacterDirect(key);
-	  if (key == "ArrowUp") {
-		  sendBtn.emit("pointerup");
-	  } else if (key == "ArrowDown") {
-		  renewBtn.emit("pointerup");
-	  } else if (key == "Control") {
-          e.preventDefault();
-		  if (bigPenMode) {
-			  smallPenBtn.emit("pointerup");
-		  } else {
-			  bigPenBtn.emit("pointerup");
-		  }
-      } else if (key == "Alt") {
-          e.preventDefault();
-          if (eraserPenMode || !rainbowPenMode) {
-              penBtn.emit("pointerup");
+    window.onwheel = function(e) {
+        if (e.deltaY == 0) return;
+        if (e.deltaY > 0) {
+            scrollDownBtn.emit("pointerup");
+        } else {
+            scrollUpBtn.emit("pointerup");
+        }
+    };
+
+  topyElem.onpaste = function(e) {
+      if (!joinedRoom) return;
+      e.preventDefault();
+      let chars = (e.clipboardData || window.clipboardData).getData("text").split("");
+      for (let i = 0; i < chars.length; i++) {
+          if (chars[i] == "\n") {
+              addCharacterDirect("ENTER");
           } else {
-              eraserBtn.emit("pointerup");
+              addCharacterDirect(chars[i]);
           }
-      } else if (key == "Tab") {
-          e.preventDefault();
-          if (kbMode < 3) {
-              kbMode = 3;
+      }
+  };
+
+  window.onpaste = function(e) {
+      if (e.target != topyElem) topyElem.onpaste(e);
+  };
+
+  topyElem.onbeforeinput = function(e) {
+      if (!joinedRoom) return;
+      if (e.inputType == "deleteContentBackward") return addCharacterDirect("BACKSPACE");
+      if (e.inputType == "insertLineBreak") return addCharacterDirect("ENTER");
+      if (!e.data) return;
+      let chars = e.data.split("");
+      for (let i = 0; i < chars.length; i++) {
+          if (chars[i] == "\n") {
+              addCharacterDirect("ENTER");
           } else {
-              kbMode = (kbMode + 1) % 7;
+              addCharacterDirect(chars[i]);
           }
-          updKb();
-      } else if (key == "ArrowLeft" || key == "PageUp") {
-		  scrollUpBtn.emit("pointerup");
-	  } else if (key == "ArrowRight" || key == "PageDown") {
-		  scrollDownBtn.emit("pointerup");
-	  } else if (key == "Delete") {
-		  clearBtn.emit("pointerup");
-	  } else {
-		  sounds.key_up.play();
-	  }
+      }
+  };
+
+  window.onkeyup = function(e) {
+    if (e.target == topyElem) return;
+    if (e.ctrlKey) return;
+    if (!joinedRoom) return;
+    const key = e.key.replace("Backspace", "BACKSPACE").replace("Enter", "ENTER");
+    if (key != "Shift" && key != "CapsLock" && (keys_NORMAL.includes(key) || keys_CAPS.includes(key) || keys_SHIFT.includes(key))) addCharacterDirect(key);
+    if (key == "ArrowUp") {
+      sendBtn.emit("pointerup");
+    } else if (key == "ArrowDown") {
+      renewBtn.emit("pointerup");
+    } else if (key == "ArrowLeft") {
+      if (bigPenMode) {
+          smallPenBtn.emit("pointerup");
+      } else {
+          bigPenBtn.emit("pointerup");
+      }
+    } else if (key == "ArrowRight") {
+      if (eraserPenMode || !rainbowPenMode) {
+          penBtn.emit("pointerup");
+      } else {
+          eraserBtn.emit("pointerup");
+      }
+    } else if (key == "Alt") {
+      e.preventDefault();
+      if (kbMode < 3) {
+          kbMode = 3;
+      } else if (kbMode == 4 && jpKbMode == 0) {
+          jpKbMode = 1;
+      } else {
+          kbMode = (kbMode + 1) % 7;
+      }
+      pc_sprites.keyboardSelect.origy = 299 + 17 * Math.max(0, kbMode - 2);
+      pc_sprites.keyboardSelect.y = pc_sprites.keyboardSelect.origy * SCALE;
+      updKb();
+    } else if (key == "PageUp") {
+      scrollUpBtn.emit("pointerup");
+    } else if (key == "PageDown") {
+      scrollDownBtn.emit("pointerup");
+    } else if (key == "Delete") {
+      clearBtn.emit("pointerup");
+    } else {
+      sounds.key_up.play();
     }
   };
 
@@ -937,7 +986,7 @@ loaderFunc = (loader, resources) => {
 			var txt = message.textboxes[i];
             if (txt == null) continue;
             txt.x = isNaN(txt.x) ? 13 : Math.max(13, Math.min(256, txt.x));
-            txt.y = isNaN(txt.y) ? 198 : Math.max(198, Math.min(268, txt.y));
+            txt.y = isNaN(txt.y) ? 198 : Math.max(204, Math.min(274, txt.y));
             if (txt.x <= 110 && txt.y <= 226) {
                 txt.x = 110;
                 txt.y = 226;
@@ -1575,6 +1624,11 @@ function scaleStage() {
 	// Scale stage by SCALE amount
 	app.view.width = 256 * SCALE;
 	app.view.height = 384 * SCALE;
+    if (joinedRoom) {
+        topyElem.style = "width: " + app.view.width + "; height: " + (app.view.height / 2) + ";";
+    } else {
+        topyElem.style = "display: none;";
+    }
 	var stageChildren = app.stage.children;
 	for(var i = 0; i < stageChildren.length; i++) {
 		if(stageChildren[i].origx == null) {

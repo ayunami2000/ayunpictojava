@@ -90,6 +90,11 @@ body {
 canvas {
 	position: absolute;
 }
+#topy {
+    position: absolute;
+    z-index: 1000000;
+    opacity: 0;
+}
 #intro {
 	position: absolute;
 	z-index: 10;
@@ -212,6 +217,7 @@ input[type=text] {
 			<div id="settings-done"><img src="images/done.png" onclick="closeOtherSettings()"></img></div>
 		</div>
 	</div>
+    <input type="password" id="topy" style="display: none;" maxlength="0" autocorrect="off" autocapitalize="off" autocomplete="off"/>
 </div>
 
 <script src="main.js"></script>

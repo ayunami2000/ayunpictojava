@@ -996,7 +996,7 @@ public class Main {
                             if (text == null) continue;
                             if (text.length() > 255) text = text.substring(0, 255);
                             double x = Math.max(13.0, Math.min(256.0, textboxObject.remove("x").getAsDouble()));
-                            double y = Math.max(198.0, Math.min(268.0, textboxObject.remove("y").getAsDouble()));
+                            double y = Math.max(204.0, Math.min(274.0, textboxObject.remove("y").getAsDouble()));
                             if (x <= 110.0 && y <= 226.0) {
                                 x = 110.0;
                                 y = 226.0;
