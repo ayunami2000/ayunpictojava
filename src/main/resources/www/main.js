@@ -131,6 +131,10 @@ loaderFunc = (loader, resources) => {
     window.onwheel = function (e) {
         if (e.deltaY === 0) return;
         if (e.deltaY > 0) {
+            if (doubleTapTimeout !== -1) {
+                clearTimeout(doubleTapTimeout);
+                doubleTapTimeout = -1;
+            }
             scrollDownBtn.emit("pointerup");
         } else {
             scrollUpBtn.emit("pointerup");
@@ -190,6 +194,13 @@ loaderFunc = (loader, resources) => {
         } else if (key === "PageUp") {
             scrollUpBtn.emit("pointerup");
         } else if (key === "PageDown") {
+            if (doubleTapTimeout !== -1) {
+                clearTimeout(doubleTapTimeout);
+                doubleTapTimeout = -1;
+            }
+            scrollDownBtn.emit("pointerup");
+        } else if (key === "End") {
+            scrollDownBtn.emit("pointerup");
             scrollDownBtn.emit("pointerup");
         } else if (key === "Delete") {
             clearBtn.emit("pointerup");
@@ -527,6 +538,10 @@ loaderFunc = (loader, resources) => {
         return sb;
     }
 
+    let dontAutoScroll = false;
+
+    let doubleTapTimeout = -1;
+
     let rainbowTintInterval = -1;
 
     function createStageButton(x, y, w, h, action) {
@@ -555,11 +570,16 @@ loaderFunc = (loader, resources) => {
                         }
                         let obj = {type: "cl_sendMessage", message: message};
                         websocket.send(JSON.stringify(obj));
+                        let oldScrollPos = scrollPos;
                         scrollPos = pc_sprites.scrollContainer.children.length - 1;
                         scrollTo(scrollPos, -1);
                         let box = generateMessageBox(message).box;
                         let height = box.height + 2;
                         scrollMessages(height);
+                        if (dontAutoScroll) {
+                            scrollPos = oldScrollPos;
+                            scrollTo(scrollPos, -1);
+                        }
                     } else {
                         sounds.error.play();
                     }
@@ -632,14 +652,23 @@ loaderFunc = (loader, resources) => {
                     sounds.scroll.play();
                     scrollPos--;
                     if (scrollPos < 0) scrollPos = 0;
+                    dontAutoScroll = scrollPos !== pc_sprites.scrollContainer.children.length - 1;
                     scrollTo(scrollPos, 1);
                     break;
                 }
                 case "SCROLL_DOWN": {
                     sounds.scroll.play();
-                    scrollPos++;
-                    if (scrollPos > pc_sprites.scrollContainer.children.length - 1)
+                    if (doubleTapTimeout === -1) {
+                        doubleTapTimeout = setTimeout(function() {
+                            doubleTapTimeout = -1;
+                        }, 200);
+                        scrollPos++;
+                        if (scrollPos > pc_sprites.scrollContainer.children.length - 1)
+                            scrollPos = pc_sprites.scrollContainer.children.length - 1;
+                    } else {
                         scrollPos = pc_sprites.scrollContainer.children.length - 1;
+                    }
+                    dontAutoScroll = scrollPos !== pc_sprites.scrollContainer.children.length - 1;
                     scrollTo(scrollPos, 1);
                     break;
                 }
@@ -1023,59 +1052,73 @@ loaderFunc = (loader, resources) => {
 
         pc_sprites.scrollContainer.addChild(container);
         container.y = height;
+        let oldScrollPos = scrollPos;
         scrollPos = pc_sprites.scrollContainer.children.length - 1;
         scaleStage();
+        if (dontAutoScroll) {
+            scrollPos = oldScrollPos;
+            scrollTo(scrollPos, -1);
+        }
         return container;
     }
 
     function scrollMessages(amount) {
-        toggleScrollBtns(false);
+        if (interval !== -1) {
+            clearInterval(interval);
+            interval = -1;
+        }
         scrolling = true;
         let finalScrollPos = pc_sprites.scrollContainer.y - amount * SCALE;
         let childrenLength = pc_sprites.scrollContainer.children.length - 1;
-        let interval = setInterval(function () {
+        interval = setInterval(function () {
             if (scrolling) {
                 pc_sprites.scrollContainer.y -= 4 * SCALE;
                 if (pc_sprites.scrollContainer.y <= finalScrollPos) {
                     clearInterval(interval);
+                    interval = -1;
                     pc_sprites.scrollContainer.y = finalScrollPos;
                     scrolling = false;
-                    toggleScrollBtns(true);
                 }
                 pc_sprites.scrollContainer.origy = pc_sprites.scrollContainer.y / SCALE;
             } else {
                 clearInterval(interval);
+                interval = -1;
+                let oldScrollPos = scrollPos;
                 scrollPos = childrenLength;
-                toggleScrollBtns(true);
                 scrollTo(scrollPos, -1);
+                if (dontAutoScroll) {
+                    scrollPos = oldScrollPos;
+                    scrollTo(scrollPos, -1);
+                }
             }
         }, 1000 / 60);
     }
 
-    function toggleScrollBtns(usable) {
-        if (scrollUpBtn != null && scrollDownBtn != null) scrollUpBtn.interactive = scrollUpBtn.buttonMode = scrollDownBtn.interactive = scrollDownBtn.buttonMode = usable;
-    }
+    let interval = -1;
 
     function scrollTo(index, speed) {
         scrolling = false;
+        if (interval !== -1) {
+            clearInterval(interval);
+            interval = -1;
+        }
         let box = pc_sprites.scrollContainer.children[index];
         let targetY = (191 - box.y - box.height) * SCALE;
         if (speed > 0) {
-            toggleScrollBtns(false);
             let direction = (targetY - pc_sprites.scrollContainer.y) > 0 ? 1 : -1;
-            let interval = setInterval(function () {
+            interval = setInterval(function () {
                 pc_sprites.scrollContainer.y += 4 * SCALE * direction * speed;
                 if (direction === 1) {
                     if (pc_sprites.scrollContainer.y >= targetY) {
                         clearInterval(interval);
+                        interval = -1;
                         pc_sprites.scrollContainer.y = targetY;
-                        toggleScrollBtns(true);
                     }
                 } else {
                     if (pc_sprites.scrollContainer.y <= targetY) {
                         clearInterval(interval);
+                        interval = -1;
                         pc_sprites.scrollContainer.y = targetY;
-                        toggleScrollBtns(true);
                     }
                 }
                 pc_sprites.scrollContainer.origy = pc_sprites.scrollContainer.y / SCALE;
@@ -1216,6 +1259,7 @@ loaderFunc = (loader, resources) => {
             if (event.data === "ping") {
                 heartbeat();
             } else {
+                let oldScrollPos;
                 let obj = JSON.parse(event.data);
                 //console.log(obj);
                 switch (obj.type) {
@@ -1237,6 +1281,7 @@ loaderFunc = (loader, resources) => {
                     case "sv_playerJoined": {
                         if (inRoom)
                             sounds.player_join.play();
+                        oldScrollPos = scrollPos;
                         scrollPos = pc_sprites.scrollContainer.children.length - 1;
                         scrollTo(scrollPos, -1);
                         let joinMsg = new PIXI.Sprite(resources["enter_" + roomData.id].texture);
@@ -1249,11 +1294,16 @@ loaderFunc = (loader, resources) => {
                         scrollPos = pc_sprites.scrollContainer.children.length - 1;
                         scaleStage();
                         scrollMessages(joinMsg.height + 2);
+                        if (dontAutoScroll) {
+                            scrollPos = oldScrollPos;
+                            scrollTo(scrollPos, -1);
+                        }
                         console.log("Player " + obj.player.name + " joined " + obj.id + ".");
                         inRoom = true;
                         break;
                     }
                     case "sv_playerLeft": {
+                        oldScrollPos = scrollPos;
                         scrollPos = pc_sprites.scrollContainer.children.length - 1;
                         scrollTo(scrollPos, -1);
                         let leaveMsg = new PIXI.Sprite(resources["leave_" + roomData.id].texture);
@@ -1266,6 +1316,10 @@ loaderFunc = (loader, resources) => {
                         scrollPos = pc_sprites.scrollContainer.children.length - 1;
                         scaleStage();
                         scrollMessages(leaveMsg.height + 2);
+                        if (dontAutoScroll) {
+                            scrollPos = oldScrollPos;
+                            scrollTo(scrollPos, -1);
+                        }
                         console.log("Player " + obj.player.name + " left " + obj.id + ".");
                         sounds.player_leave.play();
                         break;
@@ -1283,16 +1337,22 @@ loaderFunc = (loader, resources) => {
                                     });
                                 });
                             }
+                            oldScrollPos = scrollPos;
                             scrollPos = pc_sprites.scrollContainer.children.length - 1;
                             scrollTo(scrollPos, -1);
                             let box = generateMessageBox(message).box;
                             let height = box.height + 2;
                             scrollMessages(height);
+                            if (dontAutoScroll) {
+                                scrollPos = oldScrollPos;
+                                scrollTo(scrollPos, -1);
+                            }
                             sounds.receive.play();
                         }
                         break;
                     }
                     case "sv_leaveRoom": {
+                        oldScrollPos = scrollPos;
                         scrollPos = pc_sprites.scrollContainer.children.length - 1;
                         scrollTo(scrollPos, -1);
                         let leaveMsg = new PIXI.Sprite(resources["leave_" + roomData.id].texture);
@@ -1305,6 +1365,10 @@ loaderFunc = (loader, resources) => {
                         scrollPos = pc_sprites.scrollContainer.children.length - 1;
                         scaleStage();
                         scrollMessages(leaveMsg.height + 2);
+                        if (dontAutoScroll) {
+                            scrollPos = oldScrollPos;
+                            scrollTo(scrollPos, -1);
+                        }
                         //leaveRoom();
                         break;
                     }
