@@ -429,7 +429,7 @@ public class Main {
 											drawing.addProperty("x", x + 27.5);
 											drawing.addProperty("y", y + 227);
 											drawing.addProperty("type", 0);
-											drawings.add(drawing);
+											// drawings.add(drawing);
 										}
 									}
 									message.add("drawing", drawings);
@@ -685,6 +685,8 @@ public class Main {
 
 		private static final AttributeKey<JsonObject> PLAYER_DATA = AttributeKey.newInstance("player-data");
 
+		private static final AttributeKey<HashSet<String>> IGNORED_PLAYERS = AttributeKey.newInstance("ignored-players");
+
 		private static final AttributeKey<String> ROOM_ID = AttributeKey.newInstance("room-id");
 
 		private static final AttributeKey<Long> COOLDOWN = AttributeKey.newInstance("cooldown");
@@ -787,6 +789,145 @@ public class Main {
 			while (salt.length() < 6) salt.append(chars.charAt(ThreadLocalRandom.current().nextInt(chars.length())));
 			return salt.toString();
 
+		}
+
+		private void sendFilteredToOthers(JsonObject player, ChannelHandlerContext playerCtx, JsonObject jsonObject, Map<JsonObject, ChannelHandlerContext> USERS) {
+			USERS = new HashMap<>(USERS);
+			for (JsonObject user : USERS.keySet()) {
+				if (user.equals(player)) continue;
+				ChannelHandlerContext userCtx = USERS.get(user);
+				if (hasIgnoredPlayer(userCtx, player.get("name").getAsString())) continue;
+				JsonObject toSend = jsonObject;
+				if (toSend.get("type").getAsString().equals("sv_receivedMessage") && hasIgnoredPlayer(playerCtx, userCtx.attr(PLAYER_DATA).get().get("name").getAsString())) {
+					toSend = new JsonObject();
+					toSend.addProperty("type", "sv_receivedMessage");
+					JsonObject message = new JsonObject();
+					message.add("player", ((JsonObject) jsonObject.get("message")).get("player"));
+					JsonArray drawings = new JsonArray();
+					JsonObject drawing = new JsonObject();
+					drawing.addProperty("x", 0);
+					drawing.addProperty("y", 0);
+					drawing.addProperty("type", 3);
+					drawings.add(drawing);
+					message.add("drawing", drawings);
+					JsonArray textboxes = new JsonArray();
+					JsonObject textbox = new JsonObject();
+					textbox.addProperty("x", 113);
+					textbox.addProperty("y", 211);
+					textbox.addProperty("text", "[This user blocked you.]");
+					textboxes.add(textbox);
+					message.add("textboxes", textboxes);
+					message.addProperty("lines", 1);
+					toSend.add("message", message);
+				}
+				userCtx.writeAndFlush(toSend);
+			}
+		}
+
+		private void sendServerMessageToPlayers(ChannelHandlerContext[] ctxs, String messageText) {
+			JsonObject jsonObject = new JsonObject();
+			jsonObject.addProperty("type", "sv_receivedMessage");
+			JsonObject message = new JsonObject();
+			JsonArray drawings = new JsonArray();
+			JsonObject drawing = new JsonObject();
+			drawing.addProperty("x", 0);
+			drawing.addProperty("y", 0);
+			drawing.addProperty("type", 3);
+			drawings.add(drawing);
+			message.add("drawing", drawings);
+			JsonArray textboxes = new JsonArray();
+			String[] lines;
+			if (messageText.length() > 25) {
+				String firstLine = messageText.substring(0, 25);
+				String[] lastLines = messageText.substring(25).split("(?<=\\G.{40})", 4);
+				lines = new String[lastLines.length + 1];
+				System.arraycopy(lastLines, 0, lines, 1, lastLines.length);
+				lines[0] = firstLine;
+				String lastLine = lines[lines.length - 1];
+				if (lastLine.length() > 37)
+					lines[lines.length - 1] = lastLine.substring(0, 37) + "...";
+			} else {
+				lines = new String[]{messageText};
+			}
+			for (int i = 0; i < lines.length; i++) {
+				JsonObject textbox = new JsonObject();
+				textbox.addProperty("x", i == 0 ? 113 : 27);
+				textbox.addProperty("y", 211 + i * 16);
+				textbox.addProperty("text", lines[i]);
+				textboxes.add(textbox);
+			}
+			message.add("textboxes", textboxes);
+			message.addProperty("lines", lines.length);
+			JsonObject player = new JsonObject();
+			// {SERVER} deliberately has characters in it that no user message can ever have
+			// so that server messages cannot be faked
+			// this will be important if server messages are used for more security-relevant uses later
+			player.addProperty("name", "{SERVER}");
+			player.addProperty("color", 51356);
+			message.add("player", player);
+			jsonObject.add("message", message);
+			for (int i = 0; i < ctxs.length; i++) {
+				ctxs[i].writeAndFlush(jsonObject);
+			}
+		}
+
+		// Whether this person has ignored the given player.
+		private boolean hasIgnoredPlayer(ChannelHandlerContext ctx, String playerName) {
+			HashSet<String> ignored = ctx.channel().attr(IGNORED_PLAYERS).get();
+			if(ignored == null) {
+				return false;
+			} else {
+				return ignored.contains(playerName);
+			}
+		}
+
+		// Ignore the given player.
+		private void ignorePlayer(ChannelHandlerContext ctx, String playerName) {
+			HashSet<String> ignored = ctx.channel().attr(IGNORED_PLAYERS).get();
+			if(ignored == null) {
+				ignored = new HashSet<>();
+				ctx.channel().attr(IGNORED_PLAYERS).set(ignored);
+			}
+			ignored.add(playerName);
+		}
+
+		private void handleCommand(ChannelHandlerContext ctx, Map<JsonObject, ChannelHandlerContext> otherUsers, String command, String args) {
+			if (command.equalsIgnoreCase("list")) {
+				Set<JsonObject> players = new HashMap<>(otherUsers).keySet();
+				StringBuilder content = new StringBuilder();
+				for (JsonObject pl : players) content.append(pl.get("name").getAsString()).append(" ; ");
+				if (content.length() >= 3) {
+					content.delete(content.length() - 3, content.length());
+				} else {
+					content.append("(nobody is online)");
+				}
+				sendServerMessageToPlayers(new ChannelHandlerContext[]{ctx}, content.toString());
+			} else if (command.equalsIgnoreCase("block") || command.equalsIgnoreCase("ignore")) {
+				ignorePlayer(ctx, args);
+				sendServerMessageToPlayers(new ChannelHandlerContext[]{ctx}, String.format("You blocked %s for the rest of your session.", args));
+			} else {
+				sendServerMessageToPlayers(new ChannelHandlerContext[]{ctx}, String.format("Unrecognized command %s. Try !help.", command));
+			}
+		}
+
+		// returns true if the string turned out to be a command,
+		// return false if the string should be handled as a regular message.
+		private boolean tryHandleCommand(ChannelHandlerContext ctx, Map<JsonObject, ChannelHandlerContext> otherUsers, String maybeCommand) {
+			try {
+				if (maybeCommand.charAt(0) != '!') {
+					return false;
+				}
+			} catch(IndexOutOfBoundsException e) {
+				return false;
+			}
+
+			int cmdSeparator = maybeCommand.indexOf(0x20 /* space */, 1);
+			if (cmdSeparator == -1) {
+				handleCommand(ctx, otherUsers, maybeCommand.substring(1), null);
+			} else {
+				handleCommand(ctx, otherUsers, maybeCommand.substring(1, cmdSeparator), maybeCommand.substring(cmdSeparator + 1));
+			}
+			return true;
 		}
 
 		@Override
@@ -1204,63 +1345,14 @@ public class Main {
 							return;
 						}
 					}
-					if (textRaw.equalsIgnoreCase("!list")) {
-						jsonObject = new JsonObject();
-						jsonObject.addProperty("type", "sv_receivedMessage");
-						JsonObject message = new JsonObject();
-						JsonArray drawings = new JsonArray();
-						JsonObject drawing = new JsonObject();
-						drawing.addProperty("x", 0);
-						drawing.addProperty("y", 0);
-						drawing.addProperty("type", 3);
-						drawings.add(drawing);
-						message.add("drawing", drawings);
-						textboxes = new JsonArray();
-						Set<JsonObject> players = new HashMap<>(USERS).keySet();
-						StringBuilder content = new StringBuilder();
-						for (JsonObject pl : players) content.append(pl.get("name").getAsString()).append(" ; ");
-						if (content.length() >= 3) {
-							content.delete(content.length() - 3, content.length());
-						} else {
-							content.append("(nobody is online)");
-						}
-						String[] lines;
-						if (content.length() > 25) {
-							String firstLine = content.substring(0, 25);
-							String[] lastLines = content.substring(25).split("(?<=\\G.{40})", 4);
-							lines = new String[lastLines.length + 1];
-							System.arraycopy(lastLines, 0, lines, 1, lastLines.length);
-							lines[0] = firstLine;
-							String lastLine = lines[lines.length - 1];
-							if (lastLine.length() > 37)
-								lines[lines.length - 1] = lastLine.substring(0, 37) + "...";
-						} else {
-							lines = new String[]{content.toString()};
-						}
-						for (int i = 0; i < lines.length; i++) {
-							JsonObject textbox = new JsonObject();
-							textbox.addProperty("x", i == 0 ? 113 : 27);
-							textbox.addProperty("y", 211 + i * 16);
-							textbox.addProperty("text", lines[i]);
-							textboxes.add(textbox);
-						}
-						message.add("textboxes", textboxes);
-						message.addProperty("lines", lines.length);
-						player = new JsonObject();
-						player.addProperty("name", "SERVER");
-						player.addProperty("color", 51356);
-						message.add("player", player);
-						jsonObject.add("message", message);
-						ctx.writeAndFlush(jsonObject);
-						return;
-					}
+					if (tryHandleCommand(ctx, USERS, textRaw)) { return; }
 					player = ctx.channel().attr(PLAYER_DATA).get();
 					jsonObject.remove("type");
 					jsonObject.addProperty("type", "sv_receivedMessage");
 					jsonObject.getAsJsonObject("message").remove("player");
 					jsonObject.getAsJsonObject("message").add("player", player);
 					jsonObject.getAsJsonObject("message").add("textboxes", textboxesOut);
-					sendToOthers(player, jsonObject, USERS);
+					sendFilteredToOthers(player, ctx, jsonObject, USERS);
 					channel = getDiscordChannelForRoomId(roomId);
 					if (channel != null) {
 						TextChannel textChannel = jda.getTextChannelById(channel);
