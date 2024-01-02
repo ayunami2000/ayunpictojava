@@ -351,6 +351,60 @@ public class Main {
 											}
 											embeds.add(new EmbedBuilder().setTitle("Private Rooms (" + amt + ")").build());
 											statusMessage.editMessageEmbeds(embeds).queue();
+											Set<JsonObject> u = ConcurrentHashMap.newKeySet();
+											USERS_A.forEach((jo, ctx) -> {
+												if (!ctx.channel().isActive()) {
+													u.add(jo);
+												}
+											});
+											for (JsonObject jo : u) {
+												USERS_A.remove(jo);
+											}
+											u.clear();
+											USERS_B.forEach((jo, ctx) -> {
+												if (!ctx.channel().isActive()) {
+													u.add(jo);
+												}
+											});
+											for (JsonObject jo : u) {
+												USERS_B.remove(jo);
+											}
+											u.clear();
+											USERS_C.forEach((jo, ctx) -> {
+												if (!ctx.channel().isActive()) {
+													u.add(jo);
+												}
+											});
+											for (JsonObject jo : u) {
+												USERS_C.remove(jo);
+											}
+											u.clear();
+											USERS_D.forEach((jo, ctx) -> {
+												if (!ctx.channel().isActive()) {
+													u.add(jo);
+												}
+											});
+											for (JsonObject jo : u) {
+												USERS_D.remove(jo);
+											}
+											Set<Map<JsonObject, ChannelHandlerContext>> uuu = ConcurrentHashMap.newKeySet();
+											for (Map<JsonObject, ChannelHandlerContext> uu : ServerHandler.ROOM_CODES.values()) {
+												u.clear();
+												uu.forEach((jo, ctx) -> {
+													if (!ctx.channel().isActive()) {
+														u.add(jo);
+													}
+												});
+												for (JsonObject jo : u) {
+													uu.remove(jo);
+												}
+												if (uu.isEmpty()) {
+													uuu.add(uu);
+												}
+											}
+											u.clear();
+											ServerHandler.ROOM_CODES.values().removeAll(uuu);
+											uuu.clear();
 											Thread.sleep(15000);
 										} catch (Exception ignored) {
 										}
