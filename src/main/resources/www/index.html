@@ -316,14 +316,18 @@
         if (token === "invalid_domain") document.getElementById("captcha").style.opacity = 0;
     }
 
+    let authed = false;
+
     function requestVerification() {
         if (!token) return;
+        if (authed) return;
         const color = pickr.getColor().toHEXA().toString().replace("#", "0x");
         playerData.name = document.getElementById("name_box").value;
         playerData.name = playerData.name.replace(/[^\w\s]/gi, '');
         playerData.color = parseInt(color, 16);
         const obj = {type: 'cl_verifyName', player: playerData, token: token};
         websocket.send(JSON.stringify(obj));
+        authed = true;
     }
 
     function start() {

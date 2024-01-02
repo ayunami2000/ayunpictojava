@@ -12,12 +12,15 @@ import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
 import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
 import io.netty.util.AttributeKey;
+import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.api.events.session.ReadyEvent;
 import net.dv8tion.jda.api.exceptions.InvalidTokenException;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.requests.GatewayIntent;
@@ -41,6 +44,7 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -218,7 +222,7 @@ public class Main {
 			try (FileReader reader = new FileReader(BANFILE)) {
 				banList = gson.fromJson(reader, JsonArray.class);
 			} catch (IOException e) {
-				e.printStackTrace();
+				System.out.println(e.getMessage());
 				System.exit(1);
 			}
 		} else {
@@ -226,7 +230,7 @@ public class Main {
 				Files.write(BANFILE.toPath(), Collections.singleton("[]"), StandardCharsets.UTF_8);
 				banList = new JsonArray();
 			} catch (IOException e) {
-				e.printStackTrace();
+				System.out.println(e.getMessage());
 				System.exit(1);
 			}
 		}
@@ -243,7 +247,7 @@ public class Main {
 		try (FileWriter writer = new FileWriter(BANFILE)) {
 			gson.toJson(banList, writer);
 		} catch (IOException e) {
-			e.printStackTrace();
+			System.out.println(e.getMessage());
 		}
 	}
 
@@ -286,7 +290,7 @@ public class Main {
 				String token = System.getenv("PICTOJAVA_TOKEN");
 				if (token == null || token.isEmpty()) token = discordJson.get("token").getAsString();
 				JsonArray channels = discordJson.getAsJsonArray("channels");
-				if (channels.size() > 0) {
+				if (!channels.isEmpty()) {
 					channel1 = channels.get(0).getAsString();
 					if (channels.size() > 1) {
 						channel2 = channels.get(1).getAsString();
@@ -297,6 +301,63 @@ public class Main {
 					}
 					try {
 						jda = JDABuilder.createDefault(token).setActivity(Activity.playing("PictoChat Online")).enableIntents(GatewayIntent.GUILD_MESSAGES, GatewayIntent.MESSAGE_CONTENT).addEventListeners(new ListenerAdapter() {
+							@Override
+							public void onReady(@NotNull ReadyEvent event) {
+								if (!discordJson.has("status_channel")) return;
+								String statusChannelId = discordJson.get("status_channel").getAsString();
+								if (statusChannelId == null || statusChannelId.isEmpty()) return;
+								TextChannel statusChannel = jda.getTextChannelById(statusChannelId);
+								if (statusChannel == null) return;
+								statusChannel.retrievePinnedMessages().queue(messages -> {
+									boolean done = false;
+									for (Message message : messages) {
+										if (message.getAuthor().getId().equals(jda.getSelfUser().getId())) {
+											statusUpdater(message);
+											done = true;
+											break;
+										}
+									}
+									if (!done) {
+										statusChannel.sendMessage("**Loading...**").queue(message -> {
+											message.pin().queue(unused -> {
+												statusUpdater(message);
+											});
+										});
+									}
+								});
+							}
+
+							private void statusUpdater(Message statusMessage) {
+								new Thread(() -> {
+									while (true) { // i just do system.exit so idrc
+										try {
+											int amt = 0;
+											for (Map<JsonObject, ChannelHandlerContext> USERS : ServerHandler.ROOM_CODES.values()) {
+												amt += USERS.size();
+											}
+											statusMessage.editMessage("**List (" + (USERS_A.size() + USERS_B.size() + USERS_C.size() + USERS_D.size() + amt) + ")**").queue();
+											List<MessageEmbed> embeds = new ArrayList<>();
+											for (int i = 0; i < 4; i++) {
+												Map<JsonObject, ChannelHandlerContext> USERS = i == 0 ? USERS_A : (i == 1 ? USERS_B : (i == 2 ? USERS_C : USERS_D));
+												Set<JsonObject> players = USERS.keySet();
+												StringBuilder resp = new StringBuilder();
+												for (JsonObject pl : players) resp.append(pl.get("name").getAsString()).append(" ; ");
+												if (resp.length() >= 3) {
+													resp.delete(resp.length() - 3, resp.length());
+												} else {
+													resp.append("(nobody is online)");
+												}
+												embeds.add(new EmbedBuilder().setTitle((i == 0 ? "Room A" : (i == 1 ? "Room B" : (i == 2 ? "Room C" : "Room D"))) + " (" + players.size() + ")").setDescription(filterMsg(resp.toString())).build());
+											}
+											embeds.add(new EmbedBuilder().setTitle("Private Rooms (" + amt + ")").build());
+											statusMessage.editMessageEmbeds(embeds).queue();
+											Thread.sleep(15000);
+										} catch (Exception ignored) {
+										}
+									}
+								}).start();
+							}
+
 							@Override
 							public void onMessageReceived(@NotNull MessageReceivedEvent event) {
 								if (event.getAuthor().isBot()) return;
@@ -354,8 +415,8 @@ public class Main {
 								} else {
 									return;
 								}
-								if (content.toString().equalsIgnoreCase("!list")) {
-									Set<JsonObject> players = new HashMap<>(USERS).keySet();
+								if (content.toString().equalsIgnoreCase("!list") || content.toString().equalsIgnoreCase("!l")) {
+									Set<JsonObject> players = USERS.keySet();
 									StringBuilder resp = new StringBuilder();
 									for (JsonObject pl : players) resp.append(pl.get("name").getAsString()).append(" ; ");
 									if (resp.length() >= 3) {
@@ -514,6 +575,7 @@ public class Main {
 		while (running) {
 			System.out.print(">");
 			String[] cmd = consoleReader.readLine().trim().split(" ");
+			boolean ban;
 			switch (cmd[0].toLowerCase()) {
 				case "help":
 					System.out.println("Commands: help ; stop ; ban ; banip ; unbanip ; kick ; kickip");
@@ -524,7 +586,7 @@ public class Main {
 					break;
 				case "ban":
 				case "kick":
-					boolean ban = cmd[0].equalsIgnoreCase("ban");
+					ban = cmd[0].equalsIgnoreCase("ban");
 					if (cmd.length < 3) {
 						if (ban) {
 							System.out.println("Info: Bans the specified user's IP.\nUsage: ban <name> <room>");
@@ -538,7 +600,6 @@ public class Main {
 						System.out.println("Invalid room! Please specify one of: \"room_a\" ; \"room_b\" ; \"room_c\" ; \"room_d\" ; \"room_e\"");
 						break;
 					}
-					USERS = new HashMap<>(USERS);
 					boolean done = false;
 					for (JsonObject player : USERS.keySet()) {
 						if (player.get("name").getAsString().equals(cmd[1])) {
@@ -632,11 +693,14 @@ public class Main {
 			if (frame.text().equals("pong")) {
 				if (ctx.channel().hasAttr(PING_SCHEDULE)) ctx.channel().attr(PING_SCHEDULE).getAndSet(null).cancel(false);
 				ctx.channel().eventLoop().schedule(() -> {
-					if (ctx.channel().isOpen()) {
+					if (ctx.channel().hasAttr(PING_SCHEDULE)) ctx.channel().attr(PING_SCHEDULE).getAndSet(null).cancel(false);
+					if (ctx.channel().isActive()) {
 						ctx.writeAndFlush(new TextWebSocketFrame("ping"));
 						ctx.channel().attr(PING_SCHEDULE).set(ctx.channel().eventLoop().schedule(() -> {
-							if (ctx.channel().isOpen()) ctx.close();
+							ctx.close();
 						}, 10, TimeUnit.SECONDS));
+					} else {
+						ctx.close();
 					}
 				}, 10, TimeUnit.SECONDS);
 				return;
@@ -659,29 +723,35 @@ public class Main {
 		return in.replaceAll("([_*~`|\\\\<>:!])", "\\\\$1").replaceAll("@(everyone|here|[!&]?[0-9]{17,21})", "@\u200b\\\\$1");
 	}
 
-	private static final Map<JsonObject, ChannelHandlerContext> USERS_A = new HashMap<>();
+	private static final Map<JsonObject, ChannelHandlerContext> USERS_A = new ConcurrentHashMap<>();
 
-	private static final Map<JsonObject, ChannelHandlerContext> USERS_B = new HashMap<>();
+	private static final Map<JsonObject, ChannelHandlerContext> USERS_B = new ConcurrentHashMap<>();
 
-	private static final Map<JsonObject, ChannelHandlerContext> USERS_C = new HashMap<>();
+	private static final Map<JsonObject, ChannelHandlerContext> USERS_C = new ConcurrentHashMap<>();
 
-	private static final Map<JsonObject, ChannelHandlerContext> USERS_D = new HashMap<>();
+	private static final Map<JsonObject, ChannelHandlerContext> USERS_D = new ConcurrentHashMap<>();
 
 	private static void sendToOthers(JsonObject player, JsonObject jsonObject, Map<JsonObject, ChannelHandlerContext> USERS) {
-		USERS = new HashMap<>(USERS);
 		for (JsonObject user : USERS.keySet()) {
 			if (user.equals(player)) continue;
+			if (player != null) {
+				Channel ch = USERS.get(user).channel();
+				if (ch.hasAttr(ServerHandler.IGNORED_PLAYERS)) {
+					if (ch.attr(ServerHandler.IGNORED_PLAYERS).get().stream().anyMatch(s -> s.equals(player.get("name").getAsString()))) {
+						continue;
+					}
+				}
+			}
 			USERS.get(user).writeAndFlush(jsonObject);
 		}
 	}
 
 	static class ServerHandler extends SimpleChannelInboundHandler<JsonObject> {
-		/*
 		@Override
 		public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-			ctx.channel().close();
+			ctx.close();
 		}
-		*/
+		//*/
 
 		private static final AttributeKey<JsonObject> PLAYER_DATA = AttributeKey.newInstance("player-data");
 
@@ -692,12 +762,11 @@ public class Main {
 		private static final AttributeKey<Long> JOIN_COOLDOWN = AttributeKey.newInstance("join-cooldown");
 
 		private static final AttributeKey<String> PRIVATE_ROOM = AttributeKey.newInstance("private-room");
+		protected static final AttributeKey<Set<String>> IGNORED_PLAYERS = AttributeKey.newInstance("ignored-players");
 
-		private static final Set<InetAddress> ABUSERS = new HashSet<>();
+		private static final Map<InetAddress, AtomicInteger> CONS_PER_IP = new ConcurrentHashMap<>();
 
-		private static final Map<InetAddress, AtomicInteger> CONS_PER_IP = new HashMap<>();
-
-		private static final Map<String, Map<JsonObject, ChannelHandlerContext>> ROOM_CODES = new HashMap<>();
+		private static final Map<String, Map<JsonObject, ChannelHandlerContext>> ROOM_CODES = new ConcurrentHashMap<>();
 
 		private static Font font = null;
 		private static final BasicStroke stroke1 = new BasicStroke(1);
@@ -722,7 +791,7 @@ public class Main {
 			try {
 				return ImageIO.read(Objects.requireNonNull(Main.class.getResourceAsStream("/www/images/" + name + ".png")));
 			} catch (IOException e) {
-				e.printStackTrace();
+				System.out.println(e.getMessage());
 				System.exit(1);
 			}
 			return null;
@@ -791,11 +860,16 @@ public class Main {
 
 		@Override
 		protected void channelRead0(ChannelHandlerContext ctx, JsonObject jsonObject) {
-			InetAddress ip = ((InetSocketAddress) ctx.channel().remoteAddress()).getAddress();
 			if (!jsonObject.has("type")) {
 				ctx.close();
 				return;
 			}
+			JsonObject player;
+			String roomId;
+			JsonObject res;
+			Map<JsonObject, ChannelHandlerContext> USERS;
+			JsonObject finalPlayer;
+			String channel;
 			switch (jsonObject.get("type").getAsString()) {
 				case "cl_verifyName":
 					if (playerChecks(jsonObject)) {
@@ -817,12 +891,12 @@ public class Main {
 								return;
 							}
 						} catch (IOException e) {
-							e.printStackTrace();
+							System.out.println(e.getMessage());
 							ctx.close();
 							return;
 						}
 					}
-					JsonObject player = jsonObject.getAsJsonObject("player");
+					player = jsonObject.getAsJsonObject("player");
 					String name = player.remove("name").getAsString().replaceAll("[^A-Za-z0-9_]", "");
 					if (name.isEmpty()) name = String.valueOf(ThreadLocalRandom.current().nextInt(0, 1000000));
 					if (name.length() > 10) name = name.substring(0, 10);
@@ -831,7 +905,7 @@ public class Main {
 					if (color < 0 || color > 16777215) color = 0;
 					player.addProperty("color", color);
 					ctx.channel().attr(PLAYER_DATA).set(player);
-					JsonObject res = new JsonObject();
+					res = new JsonObject();
 					res.addProperty("type", "sv_nameVerified");
 					res.add("player", player);
 					ctx.writeAndFlush(res);
@@ -861,13 +935,9 @@ public class Main {
 						ctx.close();
 						return;
 					}
-					if (ABUSERS.contains(ip)) {
-						ctx.close();
-						return;
-					}
 					if (!ctx.channel().hasAttr(JOIN_COOLDOWN)) ctx.channel().attr(JOIN_COOLDOWN).set(0L);
 					if (ctx.channel().attr(JOIN_COOLDOWN).get() + 5000L > System.currentTimeMillis()) return;
-					String roomId = jsonObject.get("id").getAsString();
+					roomId = jsonObject.get("id").getAsString();
 					if (roomId.equals("room_e")) {
 						res = new JsonObject();
 						res.addProperty("type", "sv_roomData");
@@ -892,7 +962,7 @@ public class Main {
 						do {
 							privRoomId = genRoomCode();
 						} while (ROOM_CODES.containsKey(privRoomId));
-						Map<JsonObject, ChannelHandlerContext> map = new HashMap<>();
+						Map<JsonObject, ChannelHandlerContext> map = new ConcurrentHashMap<>();
 						map.put(ctx.channel().attr(PLAYER_DATA).get(), ctx);
 						ROOM_CODES.put(privRoomId, map);
 						ctx.channel().attr(PRIVATE_ROOM).set(privRoomId);
@@ -907,19 +977,19 @@ public class Main {
 						message.add("textboxes", textboxes);
 						message.addProperty("lines", 2);
 						player = new JsonObject();
-						player.addProperty("name", "SERVER");
+						player.addProperty("name", "[SERVER]");
 						player.addProperty("color", 51356);
 						message.add("player", player);
 						jsonObject.add("message", message);
 						ctx.writeAndFlush(jsonObject);
 						return;
 					}
-					Map<JsonObject, ChannelHandlerContext> USERS = getUsersForRoomId(roomId);
+					USERS = getUsersForRoomId(roomId);
 					if (USERS == null) return;
 					if (USERS.size() >= 16) return;
 					player = ctx.channel().attr(PLAYER_DATA).get();
 					if (USERS.containsKey(player)) return;
-					JsonObject finalPlayer = player;
+					finalPlayer = player;
 					if (USERS.keySet().stream().anyMatch(jsonObject1 -> jsonObject1.get("name").getAsString().equals(finalPlayer.get("name").getAsString()))) return;
 					ctx.channel().attr(ROOM_ID).set(roomId);
 					USERS.put(player, ctx);
@@ -932,7 +1002,7 @@ public class Main {
 					res.add("player", player);
 					res.addProperty("id", roomId);
 					sendToOthers(player, res, USERS);
-					String channel = getDiscordChannelForRoomId(roomId);
+					channel = getDiscordChannelForRoomId(roomId);
 					if (channel != null) {
 						TextChannel textChannel = jda.getTextChannelById(channel);
 						if (textChannel != null)
@@ -960,12 +1030,12 @@ public class Main {
 						JsonObject textbox = new JsonObject();
 						textbox.addProperty("x", 113);
 						textbox.addProperty("y", 211);
-						textbox.addProperty("text", "You are on cooldown!");
+						textbox.addProperty("text", "You are being ratelimited!");
 						textboxes.add(textbox);
 						message.add("textboxes", textboxes);
 						message.addProperty("lines", 1);
 						player = new JsonObject();
-						player.addProperty("name", "RATELIMIT");
+						player.addProperty("name", "[SERVER]");
 						player.addProperty("color", 16463656);
 						message.add("player", player);
 						jsonObject.add("message", message);
@@ -1041,7 +1111,7 @@ public class Main {
 							message.add("textboxes", textboxes);
 							message.addProperty("lines", 1);
 							player = new JsonObject();
-							player.addProperty("name", "SERVER");
+							player.addProperty("name", "[SERVER]");
 							player.addProperty("color", 51356);
 							message.add("player", player);
 							jsonObject.add("message", message);
@@ -1070,7 +1140,7 @@ public class Main {
 									message.add("textboxes", textboxes);
 									message.addProperty("lines", 1);
 									player = new JsonObject();
-									player.addProperty("name", "SERVER");
+									player.addProperty("name", "[SERVER]");
 									player.addProperty("color", 51356);
 									message.add("player", player);
 									jsonObject.add("message", message);
@@ -1097,7 +1167,7 @@ public class Main {
 									message.add("textboxes", textboxes);
 									message.addProperty("lines", 1);
 									player = new JsonObject();
-									player.addProperty("name", "SERVER");
+									player.addProperty("name", "[SERVER]");
 									player.addProperty("color", 51356);
 									message.add("player", player);
 									jsonObject.add("message", message);
@@ -1125,7 +1195,7 @@ public class Main {
 									message.add("textboxes", textboxes);
 									message.addProperty("lines", 1);
 									player = new JsonObject();
-									player.addProperty("name", "SERVER");
+									player.addProperty("name", "[SERVER]");
 									player.addProperty("color", 51356);
 									message.add("player", player);
 									jsonObject.add("message", message);
@@ -1151,7 +1221,7 @@ public class Main {
 								message.add("textboxes", textboxes);
 								message.addProperty("lines", 1);
 								player = new JsonObject();
-								player.addProperty("name", "SERVER");
+								player.addProperty("name", "[SERVER]");
 								player.addProperty("color", 51356);
 								message.add("player", player);
 								jsonObject.add("message", message);
@@ -1159,7 +1229,7 @@ public class Main {
 								player = ctx.channel().attr(PLAYER_DATA).get();
 								String oldPrivRoomId = ctx.channel().attr(PRIVATE_ROOM).get();
 								USERS.remove(player);
-								if (USERS.size() == 0) {
+								if (USERS.isEmpty()) {
 									ROOM_CODES.remove(oldPrivRoomId);
 								} else {
 									jsonObject = new JsonObject();
@@ -1195,7 +1265,7 @@ public class Main {
 								message.add("textboxes", textboxes);
 								message.addProperty("lines", 1);
 								player = new JsonObject();
-								player.addProperty("name", "SERVER");
+								player.addProperty("name", "[SERVER]");
 								player.addProperty("color", 51356);
 								message.add("player", player);
 								jsonObject.add("message", message);
@@ -1204,7 +1274,7 @@ public class Main {
 							return;
 						}
 					}
-					if (textRaw.equalsIgnoreCase("!list")) {
+					if (textRaw.equalsIgnoreCase("!list") || textRaw.equalsIgnoreCase("!l")) {
 						jsonObject = new JsonObject();
 						jsonObject.addProperty("type", "sv_receivedMessage");
 						JsonObject message = new JsonObject();
@@ -1216,7 +1286,7 @@ public class Main {
 						drawings.add(drawing);
 						message.add("drawing", drawings);
 						textboxes = new JsonArray();
-						Set<JsonObject> players = new HashMap<>(USERS).keySet();
+						Set<JsonObject> players = USERS.keySet();
 						StringBuilder content = new StringBuilder();
 						for (JsonObject pl : players) content.append(pl.get("name").getAsString()).append(" ; ");
 						if (content.length() >= 3) {
@@ -1247,7 +1317,47 @@ public class Main {
 						message.add("textboxes", textboxes);
 						message.addProperty("lines", lines.length);
 						player = new JsonObject();
-						player.addProperty("name", "SERVER");
+						player.addProperty("name", "[SERVER]");
+						player.addProperty("color", 51356);
+						message.add("player", player);
+						jsonObject.add("message", message);
+						ctx.writeAndFlush(jsonObject);
+						return;
+					}
+					if ((textRaw.toLowerCase().startsWith("!block ") && textRaw.length() > 7) || (textRaw.toLowerCase().startsWith("!ignore ") && textRaw.length() > 8) || (textRaw.toLowerCase().startsWith("!unblock ") && textRaw.length() > 9) || (textRaw.toLowerCase().startsWith("!unignore ") && textRaw.length() > 10)) {
+						if (!ctx.channel().hasAttr(IGNORED_PLAYERS)) {
+							ctx.channel().attr(IGNORED_PLAYERS).set(ConcurrentHashMap.newKeySet());
+						}
+						String target = textRaw.replace("\n", "").substring(textRaw.indexOf(' ') + 1);
+						if (target.length() > 10) {
+							target = target.substring(0, 10);
+						}
+						Set<String> ignored = ctx.channel().attr(IGNORED_PLAYERS).get();
+						String finalTarget = target;
+						boolean removed = ignored.removeIf(s -> s.equals(finalTarget));
+						if (!removed) {
+							ignored.add(target);
+						}
+						jsonObject = new JsonObject();
+						jsonObject.addProperty("type", "sv_receivedMessage");
+						JsonObject message = new JsonObject();
+						JsonArray drawings = new JsonArray();
+						JsonObject drawing = new JsonObject();
+						drawing.addProperty("x", 0);
+						drawing.addProperty("y", 0);
+						drawing.addProperty("type", 3);
+						drawings.add(drawing);
+						message.add("drawing", drawings);
+						textboxes = new JsonArray();
+						JsonObject textbox = new JsonObject();
+						textbox.addProperty("x", 113);
+						textbox.addProperty("y", 211);
+						textbox.addProperty("text", (removed ? "Unb" : "B") + "locked: " + target);
+						textboxes.add(textbox);
+						message.add("textboxes", textboxes);
+						message.addProperty("lines", 1);
+						player = new JsonObject();
+						player.addProperty("name", "[SERVER]");
 						player.addProperty("color", 51356);
 						message.add("player", player);
 						jsonObject.add("message", message);
@@ -1338,12 +1448,13 @@ public class Main {
 										x = 88.0;
 										y = 18.0;
 									}
+									Point2D point;
 									switch (type) {
 										case -1:
 											break;
 										case 0:
 											if (rainbow) {
-												Point2D point = polyline.getCurrentPoint();
+												point = polyline.getCurrentPoint();
 												if (point != null) {
 													g2d.draw(polyline);
 													polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
@@ -1359,7 +1470,7 @@ public class Main {
 											polyline.moveTo(x, y);
 											break;
 										case 3:
-											Point2D point = polyline.getCurrentPoint();
+											point = polyline.getCurrentPoint();
 											if (point != null) {
 												g2d.draw(polyline);
 												polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
@@ -1434,8 +1545,9 @@ public class Main {
 					if (roomId == null) return;
 					if (roomId.equals("room_e")) {
 						String privRoomId = ctx.channel().attr(PRIVATE_ROOM).get();
-						ROOM_CODES.get(privRoomId).remove(ctx.channel().attr(PLAYER_DATA).get());
-						if (ROOM_CODES.get(privRoomId).size() == 0) {
+						Map<JsonObject, ChannelHandlerContext> u = ROOM_CODES.get(privRoomId);
+						u.remove(ctx.channel().attr(PLAYER_DATA).get());
+						if (u.isEmpty()) {
 							ROOM_CODES.remove(privRoomId);
 						} else {
 							player = ctx.channel().attr(PLAYER_DATA).get();
@@ -1443,7 +1555,7 @@ public class Main {
 							jsonObject.addProperty("type", "sv_playerLeft");
 							jsonObject.add("player", player);
 							jsonObject.addProperty("id", roomId);
-							sendToOthers(player, jsonObject, ROOM_CODES.get(privRoomId));
+							sendToOthers(player, jsonObject, u);
 						}
 						return;
 					}
@@ -1476,20 +1588,7 @@ public class Main {
 			CONS_PER_IP.putIfAbsent(ip, new AtomicInteger(0));
 			if (CONS_PER_IP.get(ip).getAndIncrement() > 5) {
 				ctx.close();
-				return;
 			}
-			final int[] rate = {0};
-			ctx.channel().eventLoop().scheduleAtFixedRate(() -> {
-				if (rate[0] >= 10) {
-					ABUSERS.add(ip);
-					ctx.channel().eventLoop().schedule(() -> {
-						ABUSERS.remove(ip);
-					}, 10, TimeUnit.SECONDS);
-					ctx.close();
-				} else {
-					rate[0] = 0;
-				}
-			}, 0, 5, TimeUnit.SECONDS);
 		}
 
 		@Override
@@ -1502,8 +1601,9 @@ public class Main {
 				if (roomId == null) return;
 				if (roomId.equals("room_e")) {
 					String privRoomId = ctx.channel().attr(PRIVATE_ROOM).get();
-					ROOM_CODES.get(privRoomId).remove(ctx.channel().attr(PLAYER_DATA).get());
-					if (ROOM_CODES.get(privRoomId).size() == 0) {
+					Map<JsonObject, ChannelHandlerContext> u = ROOM_CODES.get(privRoomId);
+					u.remove(ctx.channel().attr(PLAYER_DATA).get());
+					if (u.isEmpty()) {
 						ROOM_CODES.remove(privRoomId);
 					} else {
 						JsonObject player = ctx.channel().attr(PLAYER_DATA).get();
@@ -1511,7 +1611,7 @@ public class Main {
 						jsonObject.addProperty("type", "sv_playerLeft");
 						jsonObject.add("player", player);
 						jsonObject.addProperty("id", roomId);
-						sendToOthers(player, jsonObject, ROOM_CODES.get(privRoomId));
+						sendToOthers(player, jsonObject, u);
 					}
 					return;
 				}

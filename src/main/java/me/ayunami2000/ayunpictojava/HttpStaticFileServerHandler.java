@@ -56,7 +56,7 @@ import static io.netty.handler.codec.http.HttpVersion.*;
  * HTTP responses.  It also implements {@code 'If-Modified-Since'} header to
  * take advantage of browser cache, as described in
  * <a href="https://tools.ietf.org/html/rfc2616#section-14.25">RFC 2616</a>.
- *
+ * <p>
  * <h3>How Browser Caching Works</h3>
  * <p>
  * Web browser caching works with HTTP headers as illustrated by the following
