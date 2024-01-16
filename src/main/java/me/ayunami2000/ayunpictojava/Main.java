@@ -1433,158 +1433,160 @@ public class Main {
 								textChannel.sendMessage(filterMsg(player.get("name").getAsString() + " » " + textRaw)).queue();
 							if (jsonObject.getAsJsonObject("message").has("drawing")) {
 								JsonArray drawing = jsonObject.getAsJsonObject("message").getAsJsonArray("drawing");
-								int lines = jsonObject.getAsJsonObject("message").get("lines").getAsInt();
-								BufferedImage box_bg;
-								BufferedImage box_lines;
-								BufferedImage box_outline;
-								switch (lines) {
-									case 1:
-										box_bg = box_bg1;
-										box_lines = box_lines1;
-										box_outline = box_outline1;
-										break;
-									case 2:
-										box_bg = box_bg2;
-										box_lines = box_lines2;
-										box_outline = box_outline2;
-										break;
-									case 3:
-										box_bg = box_bg3;
-										box_lines = box_lines3;
-										box_outline = box_outline3;
-										break;
-									case 4:
-										box_bg = box_bg4;
-										box_lines = box_lines4;
-										box_outline = box_outline4;
-										break;
-									case 5:
-										box_bg = box_bg5;
-										box_lines = box_lines5;
-										box_outline = box_outline5;
-										break;
-									default:
-										return;
-								}
-								BufferedImage drawingImage = biDeepCopy(box_bg);
-								Graphics2D g2d = drawingImage.createGraphics();
-								g2d.setBackground(fgColor);
-								Color col = new Color(player.get("color").getAsInt());
-								box_lines = biDeepCopy(box_lines);
-								tint(box_lines, col, 0.75);
-								g2d.drawImage(box_lines, 0, 0, null);
-								box_outline = biDeepCopy(box_outline);
-								tint(box_outline, col, 1);
-								g2d.drawImage(box_outline, 0, 0, null);
-								g2d.setColor(col);
-								g2d.setStroke(stroke1);
-								if (font == null) {
-									g2d.setFont(g2d.getFont().deriveFont(12F));
-								} else {
-									g2d.setFont(font);
-								}
-								g2d.drawString(player.get("name").getAsString(), 6, 16);
-								g2d.setColor(fgColor);
-								GeneralPath polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
-								polyline.moveTo(0, 0);
-								boolean rainbow = false;
-								int rainbowDeg = 348;
-								for (JsonElement jsonElement : drawing) {
-									if (!jsonElement.isJsonObject()) continue;
-									JsonObject drawingObj = jsonElement.getAsJsonObject();
-									if (!drawingObj.has("type")) continue;
-									if (!drawingObj.has("x")) continue;
-									if (!drawingObj.has("y")) continue;
-									int type = Math.max(-1, Math.min(7, drawingObj.get("type").getAsInt()));
-									double x = Math.max(0.0, Math.min(232.0, drawingObj.get("x").getAsDouble() - 22.0));
-									double y = Math.max(0.0, Math.min(83.0, drawingObj.get("y").getAsDouble() - 208.0));
-									if (x <= 88.0 && y <= 18.0) {
-										x = 88.0;
-										y = 18.0;
-									}
-									Point2D point;
-									switch (type) {
-										case -1:
+								if(drawing.size() < 32000) {
+									int lines = jsonObject.getAsJsonObject("message").get("lines").getAsInt();
+									BufferedImage box_bg;
+									BufferedImage box_lines;
+									BufferedImage box_outline;
+									switch (lines) {
+										case 1:
+											box_bg = box_bg1;
+											box_lines = box_lines1;
+											box_outline = box_outline1;
 											break;
-										case 0:
-											if (rainbow) {
+										case 2:
+											box_bg = box_bg2;
+											box_lines = box_lines2;
+											box_outline = box_outline2;
+											break;
+										case 3:
+											box_bg = box_bg3;
+											box_lines = box_lines3;
+											box_outline = box_outline3;
+											break;
+										case 4:
+											box_bg = box_bg4;
+											box_lines = box_lines4;
+											box_outline = box_outline4;
+											break;
+										case 5:
+											box_bg = box_bg5;
+											box_lines = box_lines5;
+											box_outline = box_outline5;
+											break;
+										default:
+											return;
+									}
+									BufferedImage drawingImage = biDeepCopy(box_bg);
+									Graphics2D g2d = drawingImage.createGraphics();
+									g2d.setBackground(fgColor);
+									Color col = new Color(player.get("color").getAsInt());
+									box_lines = biDeepCopy(box_lines);
+									tint(box_lines, col, 0.75);
+									g2d.drawImage(box_lines, 0, 0, null);
+									box_outline = biDeepCopy(box_outline);
+									tint(box_outline, col, 1);
+									g2d.drawImage(box_outline, 0, 0, null);
+									g2d.setColor(col);
+									g2d.setStroke(stroke1);
+									if (font == null) {
+										g2d.setFont(g2d.getFont().deriveFont(12F));
+									} else {
+										g2d.setFont(font);
+									}
+									g2d.drawString(player.get("name").getAsString(), 6, 16);
+									g2d.setColor(fgColor);
+									GeneralPath polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
+									polyline.moveTo(0, 0);
+									boolean rainbow = false;
+									int rainbowDeg = 348;
+									for (JsonElement jsonElement : drawing) {
+										if (!jsonElement.isJsonObject()) continue;
+										JsonObject drawingObj = jsonElement.getAsJsonObject();
+										if (!drawingObj.has("type")) continue;
+										if (!drawingObj.has("x")) continue;
+										if (!drawingObj.has("y")) continue;
+										int type = Math.max(-1, Math.min(7, drawingObj.get("type").getAsInt()));
+										double x = Math.max(0.0, Math.min(232.0, drawingObj.get("x").getAsDouble() - 22.0));
+										double y = Math.max(0.0, Math.min(83.0, drawingObj.get("y").getAsDouble() - 208.0));
+										if (x <= 88.0 && y <= 18.0) {
+											x = 88.0;
+											y = 18.0;
+										}
+										Point2D point;
+										switch (type) {
+											case -1:
+												break;
+											case 0:
+												if (rainbow) {
+													point = polyline.getCurrentPoint();
+													if (point != null) {
+														g2d.draw(polyline);
+														polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
+														polyline.moveTo(point.getX(), point.getY());
+													}
+													rainbowDeg = (rainbowDeg + 12) % 360;
+													g2d.setColor(Color.getHSBColor(rainbowDeg / 360F, 1F, 1F));
+												}
+												polyline.lineTo(x, y);
+												break;
+											case 1:
+											case 2:
+												polyline.moveTo(x, y);
+												break;
+											case 3:
 												point = polyline.getCurrentPoint();
 												if (point != null) {
 													g2d.draw(polyline);
 													polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
 													polyline.moveTo(point.getX(), point.getY());
 												}
-												rainbowDeg = (rainbowDeg + 12) % 360;
-												g2d.setColor(Color.getHSBColor(rainbowDeg / 360F, 1F, 1F));
-											}
-											polyline.lineTo(x, y);
-											break;
-										case 1:
-										case 2:
-											polyline.moveTo(x, y);
-											break;
-										case 3:
-											point = polyline.getCurrentPoint();
-											if (point != null) {
-												g2d.draw(polyline);
-												polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
-												polyline.moveTo(point.getX(), point.getY());
-											}
-											g2d.setStroke(stroke2);
-											break;
-										case 4:
-											point = polyline.getCurrentPoint();
-											if (point != null) {
-												g2d.draw(polyline);
-												polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
-												polyline.moveTo(point.getX(), point.getY());
-											}
-											g2d.setStroke(stroke1);
-											break;
-										case 5:
-											point = polyline.getCurrentPoint();
-											if (point != null) {
-												g2d.draw(polyline);
-												polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
-												polyline.moveTo(point.getX(), point.getY());
-											}
-											g2d.setColor(fgColor);
-											rainbow = false;
-											break;
-										case 6:
-											point = polyline.getCurrentPoint();
-											if (point != null) {
-												g2d.draw(polyline);
-												polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
-												polyline.moveTo(point.getX(), point.getY());
-											}
-											g2d.setColor(bgColor);
-											rainbow = false;
-											break;
-										case 7:
-											rainbow = true;
-											break;
+												g2d.setStroke(stroke2);
+												break;
+											case 4:
+												point = polyline.getCurrentPoint();
+												if (point != null) {
+													g2d.draw(polyline);
+													polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
+													polyline.moveTo(point.getX(), point.getY());
+												}
+												g2d.setStroke(stroke1);
+												break;
+											case 5:
+												point = polyline.getCurrentPoint();
+												if (point != null) {
+													g2d.draw(polyline);
+													polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
+													polyline.moveTo(point.getX(), point.getY());
+												}
+												g2d.setColor(fgColor);
+												rainbow = false;
+												break;
+											case 6:
+												point = polyline.getCurrentPoint();
+												if (point != null) {
+													g2d.draw(polyline);
+													polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
+													polyline.moveTo(point.getX(), point.getY());
+												}
+												g2d.setColor(bgColor);
+												rainbow = false;
+												break;
+											case 7:
+												rainbow = true;
+												break;
+										}
 									}
-								}
-								g2d.draw(polyline);
-								g2d.setStroke(stroke1);
-								g2d.setColor(fgColor);
-								for (JsonElement jsonElement : textboxesOut) {
-									if (!jsonElement.isJsonObject()) continue;
-									JsonObject textboxObj = jsonElement.getAsJsonObject();
-									if (!textboxObj.has("text")) continue;
-									if (!textboxObj.has("x")) continue;
-									if (!textboxObj.has("y")) continue;
-									String text = textboxObj.get("text").getAsString();
-									double x = textboxObj.get("x").getAsDouble() - 22;
-									double y = textboxObj.get("y").getAsDouble() - 208;
-									g2d.drawString(text, (float) x, (float) y + 12);
-								}
-								ByteArrayOutputStream baos = new ByteArrayOutputStream();
-								try {
-									ImageIO.write(drawingImage, "PNG", baos);
-									textChannel.sendFiles(FileUpload.fromData(baos.toByteArray(), "drawing.png")).queue();
-								} catch (IOException ignored) {
+									g2d.draw(polyline);
+									g2d.setStroke(stroke1);
+									g2d.setColor(fgColor);
+									for (JsonElement jsonElement : textboxesOut) {
+										if (!jsonElement.isJsonObject()) continue;
+										JsonObject textboxObj = jsonElement.getAsJsonObject();
+										if (!textboxObj.has("text")) continue;
+										if (!textboxObj.has("x")) continue;
+										if (!textboxObj.has("y")) continue;
+										String text = textboxObj.get("text").getAsString();
+										double x = textboxObj.get("x").getAsDouble() - 22;
+										double y = textboxObj.get("y").getAsDouble() - 208;
+										g2d.drawString(text, (float) x, (float) y + 12);
+									}
+									ByteArrayOutputStream baos = new ByteArrayOutputStream();
+									try {
+										ImageIO.write(drawingImage, "PNG", baos);
+										textChannel.sendFiles(FileUpload.fromData(baos.toByteArray(), "drawing.png")).queue();
+									} catch (IOException ignored) {
+									}
 								}
 							}
 						}
