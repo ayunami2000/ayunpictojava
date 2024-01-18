@@ -744,6 +744,10 @@ public class Main {
 
 		@Override
 		protected void decode(ChannelHandlerContext ctx, TextWebSocketFrame frame, List<Object> out) {
+			if (frame.content().readableBytes() > 65536) {
+				ctx.close();
+				return;
+			}
 			if (frame.text().equals("pong")) {
 				if (ctx.channel().hasAttr(PING_SCHEDULE)) ctx.channel().attr(PING_SCHEDULE).getAndSet(null).cancel(false);
 				ctx.channel().eventLoop().schedule(() -> {
@@ -1432,7 +1436,12 @@ public class Main {
 							if (!textRaw.isEmpty())
 								textChannel.sendMessage(filterMsg(player.get("name").getAsString() + " » " + textRaw)).queue();
 							if (jsonObject.getAsJsonObject("message").has("drawing")) {
+								long startTime = System.currentTimeMillis();
 								JsonArray drawing = jsonObject.getAsJsonObject("message").getAsJsonArray("drawing");
+								if (System.currentTimeMillis() - startTime > 5000) {
+									ctx.close();
+									return;
+								}
 								int lines = jsonObject.getAsJsonObject("message").get("lines").getAsInt();
 								BufferedImage box_bg;
 								BufferedImage box_lines;
@@ -1565,10 +1574,18 @@ public class Main {
 											rainbow = true;
 											break;
 									}
+									if (System.currentTimeMillis() - startTime > 5000) {
+										ctx.close();
+										return;
+									}
 								}
 								g2d.draw(polyline);
 								g2d.setStroke(stroke1);
 								g2d.setColor(fgColor);
+								if (System.currentTimeMillis() - startTime > 5000) {
+									ctx.close();
+									return;
+								}
 								for (JsonElement jsonElement : textboxesOut) {
 									if (!jsonElement.isJsonObject()) continue;
 									JsonObject textboxObj = jsonElement.getAsJsonObject();
@@ -1579,6 +1596,10 @@ public class Main {
 									double x = textboxObj.get("x").getAsDouble() - 22;
 									double y = textboxObj.get("y").getAsDouble() - 208;
 									g2d.drawString(text, (float) x, (float) y + 12);
+									if (System.currentTimeMillis() - startTime > 5000) {
+										ctx.close();
+										return;
+									}
 								}
 								ByteArrayOutputStream baos = new ByteArrayOutputStream();
 								try {
