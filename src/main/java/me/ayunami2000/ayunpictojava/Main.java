@@ -1452,6 +1452,7 @@ public class Main {
 						player.remove("name");
 						player.addProperty("name", "[SERVER]");
 						StringBuilder content = new StringBuilder("Tripcode for ").append(tenName).append(": ").append(hash);
+						textRaw = content.toString();
 						textboxesOut = new JsonArray();
 						String[] lines;
 						if (content.length() > 25) {
