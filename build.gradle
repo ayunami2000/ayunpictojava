@@ -10,10 +10,10 @@ repositories {
 }
 
 dependencies {
-    implementation 'io.netty:netty-codec-http:4.1.92.Final'
+    implementation 'io.netty:netty-codec-http:4.1.107.Final'
     implementation 'com.google.code.gson:gson:2.10.1'
-    implementation 'net.dv8tion:JDA:5.0.0-beta.9'
-    implementation 'org.slf4j:slf4j-simple:2.0.7'
+    implementation 'net.dv8tion:JDA:5.0.0-beta.20'
+    implementation 'org.slf4j:slf4j-simple:2.0.12'
     implementation 'org.asynchttpclient:async-http-client:2.12.3'
 }
 

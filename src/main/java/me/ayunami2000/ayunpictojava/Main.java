@@ -38,10 +38,13 @@ import java.awt.image.ColorModel;
 import java.awt.image.WritableRaster;
 import java.io.*;
 import java.lang.reflect.Field;
+import java.math.BigInteger;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -417,44 +420,47 @@ public class Main {
 								if (event.getAuthor().isBot()) return;
 								StringBuilder content = new StringBuilder(event.getMessage().getContentStripped().trim());
 								Set<BufferedImage> imgs = new HashSet<>();
-								for (Message.Attachment attachment : event.getMessage().getAttachments()) {
-									if (attachment.getContentType() == null || !attachment.getContentType().startsWith("image/")) {
-										content.append(" ").append(attachment.getUrl());
-										continue;
+								boolean listCmd = content.toString().equalsIgnoreCase("!list") || content.toString().equalsIgnoreCase("!l");
+								if (!listCmd) {
+									for (Message.Attachment attachment : event.getMessage().getAttachments()) {
+										if (attachment.getContentType() == null || !attachment.getContentType().startsWith("image/")) {
+											content.append(" ").append(attachment.getUrl());
+											continue;
+										}
+										int w = attachment.getWidth();
+										int h = attachment.getHeight();
+										if (w <= 0 || h <= 0) {
+											content.append(" ").append(attachment.getUrl());
+											continue;
+										}
+										double a = (double) w / ((double) h / 64.0);
+										double b = (double) h / ((double) w / 224.0);
+										if (b > 64) {
+											w = Math.max(1, (int) a);
+											h = 64;
+										} else if (a > 224) {
+											w = 224;
+											h = Math.max(1, (int) b);
+										}
+										BufferedImage img;
+										try {
+											InputStream is = attachment.getProxy().download(w, h).join();
+											img = ImageIO.read(is);
+											is.close();
+										} catch (IOException e) {
+											content.append(" ").append(attachment.getUrl());
+											continue;
+										}
+										if (img.getWidth() != w || img.getHeight() != h) {
+											Image tmp = img.getScaledInstance(w, h, Image.SCALE_FAST);
+											img = new BufferedImage(w, h, img.getType());
+											Graphics2D g2d = img.createGraphics();
+											g2d.drawImage(tmp, 0, 0, null);
+											g2d.dispose();
+										}
+										dither(img);
+										imgs.add(img);
 									}
-									int w = attachment.getWidth();
-									int h = attachment.getHeight();
-									if (w <= 0 || h <= 0) {
-										content.append(" ").append(attachment.getUrl());
-										continue;
-									}
-									double a = (double) w / ((double) h / 64.0);
-									double b = (double) h / ((double) w / 224.0);
-									if (b > 64) {
-										w = Math.max(1, (int) a);
-										h = 64;
-									} else if (a > 224) {
-										w = 224;
-										h = Math.max(1, (int) b);
-									}
-									BufferedImage img;
-									try {
-										InputStream is = attachment.getProxy().download(w, h).join();
-										img = ImageIO.read(is);
-										is.close();
-									} catch (IOException e) {
-										content.append(" ").append(attachment.getUrl());
-										continue;
-									}
-									if (img.getWidth() != w || img.getHeight() != h) {
-										Image tmp = img.getScaledInstance(w, h, Image.SCALE_FAST);
-										img = new BufferedImage(w, h, img.getType());
-										Graphics2D g2d = img.createGraphics();
-										g2d.drawImage(tmp, 0, 0, null);
-										g2d.dispose();
-									}
-									dither(img);
-									imgs.add(img);
 								}
 								String channelId = event.getChannel().getId();
 								Map<JsonObject, ChannelHandlerContext> USERS;
@@ -469,7 +475,7 @@ public class Main {
 								} else {
 									return;
 								}
-								if (content.toString().equalsIgnoreCase("!list") || content.toString().equalsIgnoreCase("!l")) {
+								if (listCmd) {
 									Set<JsonObject> players = USERS.keySet();
 									StringBuilder resp = new StringBuilder();
 									for (JsonObject pl : players) resp.append(pl.get("name").getAsString()).append(" ; ");
@@ -515,8 +521,9 @@ public class Main {
 								message.add("textboxes", textboxes);
 								message.addProperty("lines", lines.length);
 								JsonObject player = new JsonObject();
-								String name = event.getAuthor().getAsTag();
-								if (name.length() > 10) name = name.substring(0, 10);
+								String name = event.getAuthor().getName();
+								if (name.length() > 9) name = name.substring(0, 9);
+								name += "#";
 								player.addProperty("name", name);
 								player.addProperty("color", 7506394);
 								message.add("player", player);
@@ -1423,12 +1430,66 @@ public class Main {
 						return;
 					}
 					player = ctx.channel().attr(PLAYER_DATA).get();
+					boolean tcCmd = textRaw.toLowerCase().startsWith("!tripcode ") || textRaw.toLowerCase().startsWith("!tc ") || textRaw.toLowerCase().startsWith("!tripcode\n") || textRaw.toLowerCase().startsWith("!tc\n");
+					if (tcCmd) {
+						int fard = textRaw.indexOf(" ");
+						int fard2 = textRaw.indexOf("\n");
+						if (fard == -1 || (fard2 != -1 && fard2 < fard)) {
+							fard = fard2;
+						}
+						String pass = textRaw.substring(fard + 1).trim();
+						String hash;
+						try {
+							hash = new BigInteger(1, MessageDigest.getInstance("SHA-256").digest(pass.getBytes(StandardCharsets.UTF_8))).toString(36);
+						} catch (NoSuchAlgorithmException e) {
+							hash = e.getMessage();
+						}
+						String tenName = player.get("name").getAsString();
+						if (tenName.length() < 10) {
+							tenName = tenName + new String(new char[10 - tenName.length()]).replace("\0", " ");
+						}
+						player = player.deepCopy();
+						player.remove("name");
+						player.addProperty("name", "[SERVER]");
+						StringBuilder content = new StringBuilder("Tripcode for ").append(tenName).append(": ").append(hash);
+						textboxesOut = new JsonArray();
+						String[] lines;
+						if (content.length() > 25) {
+							String firstLine = content.substring(0, 25);
+							String[] lastLines = content.substring(25).split("(?<=\\G.{40})", 4);
+							lines = new String[lastLines.length + 1];
+							System.arraycopy(lastLines, 0, lines, 1, lastLines.length);
+							lines[0] = firstLine;
+							String lastLine = lines[lines.length - 1];
+							if (lastLine.length() > 37)
+								lines[lines.length - 1] = lastLine.substring(0, 37) + "...";
+						} else {
+							lines = new String[]{content.toString()};
+						}
+						for (int i = 0; i < lines.length; i++) {
+							JsonObject textbox = new JsonObject();
+							textbox.addProperty("x", i == 0 ? 113 : 27);
+							textbox.addProperty("y", 211 + i * 16);
+							textbox.addProperty("text", lines[i]);
+							textboxesOut.add(textbox);
+						}
+						jsonObject.getAsJsonObject("message").remove("lines");
+						jsonObject.getAsJsonObject("message").addProperty("lines", lines.length);
+						jsonObject.getAsJsonObject("message").remove("drawing");
+						JsonArray drawings = new JsonArray();
+						JsonObject drawing = new JsonObject();
+						drawing.addProperty("x", 0);
+						drawing.addProperty("y", 0);
+						drawing.addProperty("type", 3);
+						drawings.add(drawing);
+						jsonObject.getAsJsonObject("message").add("drawing", drawings);
+					}
 					jsonObject.remove("type");
 					jsonObject.addProperty("type", "sv_receivedMessage");
 					jsonObject.getAsJsonObject("message").remove("player");
 					jsonObject.getAsJsonObject("message").add("player", player);
 					jsonObject.getAsJsonObject("message").add("textboxes", textboxesOut);
-					sendToOthers(player, jsonObject, USERS);
+					sendToOthers(tcCmd ? null : player, jsonObject, USERS);
 					channel = getDiscordChannelForRoomId(roomId);
 					if (channel != null) {
 						TextChannel textChannel = jda.getTextChannelById(channel);
