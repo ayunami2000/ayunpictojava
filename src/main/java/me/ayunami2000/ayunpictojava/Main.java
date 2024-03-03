@@ -57,6 +57,7 @@ public class Main {
 	private static final Gson gson = new Gson();
 	private static JDA jda = null;
 	private static String secret = System.getenv("PICTOJAVA_SECRET");
+	private static String tcSecret = System.getenv("PICTOJAVA_TRIPCODE_SECRET");
 	private static String channel1 = null;
 	private static String channel2 = null;
 	private static String channel3 = null;
@@ -265,6 +266,7 @@ public class Main {
 		Reader reader = Files.newBufferedReader(settingsFile.toPath());
 		JsonObject settingsJson = gson.fromJson(reader, JsonObject.class);
 		reader.close();
+		if (tcSecret == null || tcSecret.isEmpty()) tcSecret = settingsJson.has("tripcode_secret") ? settingsJson.get("tripcode_secret").getAsString() : "";
 		int port = 8080;
 		if (settingsJson.has("port")) port = settingsJson.get("port").getAsInt();
 		String host = "127.0.0.1";
@@ -1440,7 +1442,7 @@ public class Main {
 						String pass = textRaw.substring(fard + 1).trim();
 						String hash;
 						try {
-							hash = new BigInteger(1, MessageDigest.getInstance("SHA-256").digest(pass.getBytes(StandardCharsets.UTF_8))).toString(36);
+							hash = new BigInteger(1, MessageDigest.getInstance("SHA-256").digest((tcSecret + pass).getBytes(StandardCharsets.UTF_8))).toString(36);
 						} catch (NoSuchAlgorithmException e) {
 							hash = e.getMessage();
 						}
