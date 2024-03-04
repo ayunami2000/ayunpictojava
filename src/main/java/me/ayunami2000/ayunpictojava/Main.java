@@ -753,7 +753,7 @@ public class Main {
 
 		@Override
 		protected void decode(ChannelHandlerContext ctx, TextWebSocketFrame frame, List<Object> out) {
-			if (frame.content().readableBytes() > 65536) {
+			if (frame.content().readableBytes() > 524288) {
 				ctx.close();
 				return;
 			}
