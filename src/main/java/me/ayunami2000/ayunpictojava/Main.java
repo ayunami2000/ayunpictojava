@@ -98,6 +98,7 @@ public class Main {
 				VectorRGB closest_match = bwPalette.getClosestMatch(current_color);
 				VectorRGB error = current_color.subtract(closest_match);
 				img.setRGB(x, y, closest_match.toRGB());
+				/*
 				if (!(x == img.getWidth() - 1)) {
 					img.setRGB(x + 1, y, ((new VectorRGB(img.getRGB(x + 1, y)).add(error.scalarMultiply((float) 7 / 16))).clip(0, 255).toRGB()));
 					if (!(y == img.getHeight() - 1))
@@ -107,6 +108,16 @@ public class Main {
 					img.setRGB(x, y + 1, ((new VectorRGB(img.getRGB(x, y + 1)).add(error.scalarMultiply((float) 3 / 16))).clip(0, 255).toRGB()));
 					if (!(x == 0))
 						img.setRGB(x - 1, y + 1, ((new VectorRGB(img.getRGB(x - 1, y + 1)).add(error.scalarMultiply((float) 5 / 16)).clip(0, 255).toRGB())));
+				}
+				*/
+				// https://github.com/AfricanSwift/FilterPlay/blob/40b5f73b36b4a75001203792fa72625932d89964/FilterPlay/NSImage%2BDither.swift#L106
+				if (!(x == img.getWidth() - 1)) {
+					if (!(y == 0))
+						img.setRGB(x + 1, y - 1, ((new VectorRGB(img.getRGB(x + 1, y - 1)).add(error.scalarMultiply((float) 1 / 16))).clip(0, 255).toRGB()));
+					img.setRGB(x + 1, y, ((new VectorRGB(img.getRGB(x + 1, y)).add(error.scalarMultiply((float) 1 / 16))).clip(0, 255).toRGB()));
+				}
+				if (!(y == img.getHeight() - 1)) {
+					img.setRGB(x, y + 1, ((new VectorRGB(img.getRGB(x, y + 1)).add(error.scalarMultiply((float) 2 / 16))).clip(0, 255).toRGB()));
 				}
 			}
 		}
