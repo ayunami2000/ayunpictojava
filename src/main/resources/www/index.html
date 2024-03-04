@@ -334,7 +334,8 @@
         sounds.start_app.play();
         updatePlayerData();
         document.getElementById("intro").style.opacity = 1.5;
-        document.getElementById("captcha").style.display = "none";
+        const cap = document.getElementById("captcha");
+        if (cap) cap.style.display = "none";
         let margin = 50 * SCALE;
         let marginBottom = 15;
         const interval = setInterval(function () {
