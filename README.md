@@ -1,22 +1,40 @@
-nintendo's ds pictochat recreated for browsers
+# Pictochat Online
 
-SELF HOSTING :
+Pictochat for the Nintendo DS & DSi, recreated for browsers!
 
-  prerequisite : git, gradle, java installed on your computer/server
+## In-app commands
+- `!block` / `!ignore` / `!unblock` / `!unignore` - Hide/unhide the messages of someone temporarily.
+- `!tripcode` / `!tc` - When provided with a password, will generate a tripcode and send it as the server. Used for verification that someone is who they say they are.
+- `!list` / `!l` - Lists online users.
 
-(all of theses steps happens in the terminal)
-1) clone the repository with the git command in your user folder
-2) get in the newly created folder with the cd command
-3) run the command "sudo chmod +x gradlew" (without the "")
-4) run the command "sudo ./gradlew build"
-5) once this step is done (signalised by the message "BUILD SUCCESSFUL in []s"), a new folder will have been created called build/ (this folder is owned by root so make sure to use the sudo command to be able to access it)
-6) go into this build folder, then into the libs folder
-7) you will see a file named ayunpictojava-1.0-SNAPSHOT.jar or an equivalent, you then need to run this file with the command "java -jar ayunpictojava-1.0-SNAPSHOT.jar" (if in the future the file isnt named exactly that, replace it with its new name)
-8) you should see a line in the terminal saying that the server is running on 127.0.0.1:8080
+## Discord commands
+- `!list` / `!l` - Lists online users.
 
-changing the port :
+## Self hosting
+You will need:
+- Git
+- Gradle
+- Java 8+ (JDK)
 
-without any changes, the port is in localhost, so unavailable to anyone in your network, if you want to make it available for other users you need to change the port by :
-in the terminal, in the folder containing the .jar file and AFTER it has been run at least once, run the command "sudo nano settings.json"
-you will then see a "port" and a "host" line, the port doesnt need to be changed but can be, the port should be changed to the local ip adress of the machine running this jar file
-exist and save the changes, once you lunch the server it will run on the local ip adress you gave it
+(All of theses steps happens in the terminal/command line)
+1) Clone the repository with the git command (`git clone https://github.com/ayunami2000/ayunpictojava`)
+2) Get in the newly created folder with the cd command (`cd ayunpictojava`)
+3) Make gradlew executable (`chmod +x gradlew`) (Windows: skip this step)
+4) Build the project with gradle (`./gradlew build`) (Windows: `gradlew.bat build`)
+5) Once you see the message "BUILD SUCCESSFUL in []s", a new folder will have been created called `build`
+6) Go into this build folder, then into the libs folder
+7) You will see a file named ayunpictojava-1.0-SNAPSHOT.jar or an equivalent, this is the compiled program!
+8) Copy this file to its' own folder for running, and run it (`java -jar ayunpictojava-1.0-SNAPSHOT.jar`) (or whatever the .jar file is named)
+9) You should see a line in the terminal saying that the server is running on 127.0.0.1:8080, once you see this you can try it out at http://localhost:8080
+
+### Changing the port and bind address
+By default, the application will bind to the local address and port 8080. This means that by default it will not be accessible to anyone else on your network.
+To make it accessible, edit the `settings.json` file that is generated after being run at least once, and set host to `0.0.0.0` or `::`. Rerun the program to apply changes.
+You can change the port and other configurable settings as well in a similar manner.
+
+### Making tripcodes unique
+To make tripcodes unique and reduce the risk of cracking, in the `settings.json` file, set the `tripcode_secret` to something unique and do not share it.
+
+### The captcha
+To use the captcha, set the `secret` in the settings.json to your Cloudflare Turnstile captcha secret.
+To disable the captcha entirely, edit the `www/index.html` file and search for `let token = false;` and change it to `let token = true;`. Then, remove or comment out the `<div id="captcha" ...` element and the `<script src="https://challenges.cloudflare.com/ ...` element.
