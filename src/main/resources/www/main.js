@@ -1242,21 +1242,22 @@ loaderFunc = (loader, resources) => {
     }
 
     function setupWebSocket() {
+		//Keeps the connection alive
         function heartbeat() {
             websocket.send("pong");
+			//console.log("Pong sent");
             clearTimeout(websocket.pingTimeout);
-            websocket.pingTimeout = setTimeout(() => {
-                websocket.terminate();
-            }, 11000);
         }
 
         websocket.onopen = function (event) {
             console.log("WebSocket connection established.", event);
-            heartbeat();
+            //heartbeat();
+			websocket.send("handshake");
         };
 
         websocket.onmessage = function (event) {
             if (event.data === "ping") {
+				//console.log("Ping received");
                 heartbeat();
             } else {
                 let oldScrollPos;
