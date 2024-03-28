@@ -1251,6 +1251,13 @@ loaderFunc = (loader, resources) => {
 
         websocket.onopen = function (event) {
             console.log("WebSocket connection established.", event);
+						
+			//Enable the button!
+			var logo_element = document.getElementById('logo');
+			logo_element.src = 'images/logo.png';
+			logo_element.title = 'Click to join PictoChat Session!';
+			logo_element.onclick = requestVerification;
+			
             //heartbeat();
 			websocket.send("handshake");
         };
