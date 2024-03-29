@@ -98,7 +98,6 @@ public class Main {
 				VectorRGB closest_match = bwPalette.getClosestMatch(current_color);
 				VectorRGB error = current_color.subtract(closest_match);
 				img.setRGB(x, y, closest_match.toRGB());
-				/*
 				if (!(x == img.getWidth() - 1)) {
 					img.setRGB(x + 1, y, ((new VectorRGB(img.getRGB(x + 1, y)).add(error.scalarMultiply((float) 7 / 16))).clip(0, 255).toRGB()));
 					if (!(y == img.getHeight() - 1))
@@ -109,7 +108,7 @@ public class Main {
 					if (!(x == 0))
 						img.setRGB(x - 1, y + 1, ((new VectorRGB(img.getRGB(x - 1, y + 1)).add(error.scalarMultiply((float) 5 / 16)).clip(0, 255).toRGB())));
 				}
-				*/
+				/*
 				// https://github.com/AfricanSwift/FilterPlay/blob/40b5f73b36b4a75001203792fa72625932d89964/FilterPlay/NSImage%2BDither.swift#L106
 				if (!(x == img.getWidth() - 1)) {
 					if (!(y == 0))
@@ -119,6 +118,7 @@ public class Main {
 				if (!(y == img.getHeight() - 1)) {
 					img.setRGB(x, y + 1, ((new VectorRGB(img.getRGB(x, y + 1)).add(error.scalarMultiply((float) 2 / 16))).clip(0, 255).toRGB()));
 				}
+				*/
 			}
 		}
 	}
@@ -846,6 +846,7 @@ public class Main {
 		private static final AttributeKey<String> ROOM_ID = AttributeKey.newInstance("room-id");
 
 		private static final AttributeKey<Long> COOLDOWN = AttributeKey.newInstance("cooldown");
+		private static final AttributeKey<Integer> RATELIMIT = AttributeKey.newInstance("ratelimit");
 
 		private static final AttributeKey<Long> JOIN_COOLDOWN = AttributeKey.newInstance("join-cooldown");
 
@@ -1102,8 +1103,10 @@ public class Main {
 						ctx.close();
 						return;
 					}
-					if (!ctx.channel().hasAttr(COOLDOWN)) ctx.channel().attr(COOLDOWN).set(0L);
-					if (ctx.channel().attr(COOLDOWN).get() + 1000 > System.currentTimeMillis()) {
+
+					if (!ctx.channel().hasAttr(COOLDOWN)) ctx.channel().attr(COOLDOWN).set(System.currentTimeMillis() - 64000L);
+					if (!ctx.channel().hasAttr(RATELIMIT)) ctx.channel().attr(RATELIMIT).set(1000);
+					if (ctx.channel().attr(COOLDOWN).get() > System.currentTimeMillis()) {
 						jsonObject = new JsonObject();
 						jsonObject.addProperty("type", "sv_receivedMessage");
 						JsonObject message = new JsonObject();
@@ -1118,7 +1121,7 @@ public class Main {
 						JsonObject textbox = new JsonObject();
 						textbox.addProperty("x", 113);
 						textbox.addProperty("y", 211);
-						textbox.addProperty("text", "You are being ratelimited!");
+						textbox.addProperty("text", "Ratelimited: Please wait " + (ctx.channel().attr(RATELIMIT).get() / 1000) + "s");
 						textboxes.add(textbox);
 						message.add("textboxes", textboxes);
 						message.addProperty("lines", 1);
@@ -1130,7 +1133,12 @@ public class Main {
 						ctx.writeAndFlush(jsonObject);
 						return;
 					} else {
-						ctx.channel().attr(COOLDOWN).set(System.currentTimeMillis());
+						if (System.currentTimeMillis() - ctx.channel().attr(COOLDOWN).get() < ctx.channel().attr(RATELIMIT).get() * 2) {
+							ctx.channel().attr(RATELIMIT).set(Math.min(32000, ctx.channel().attr(RATELIMIT).get() * 2));
+						} else {
+							ctx.channel().attr(RATELIMIT).set(1000);
+						}
+						ctx.channel().attr(COOLDOWN).set(System.currentTimeMillis() + ctx.channel().attr(RATELIMIT).get());
 					}
 					roomId = ctx.channel().attr(ROOM_ID).get();
 					if (roomId == null) return;
