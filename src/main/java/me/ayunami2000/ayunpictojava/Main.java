@@ -761,6 +761,7 @@ public class Main {
 
 	static class WebSocketFrameToJsonObjectDecoder extends MessageToMessageDecoder<TextWebSocketFrame> {
 		private static final AttributeKey<ScheduledFuture<?>> PING_SCHEDULE = AttributeKey.valueOf("ping-schedule");
+		private boolean handshakeReceived = false;
 
 		@Override
 		protected void decode(ChannelHandlerContext ctx, TextWebSocketFrame frame, List<Object> out) {
@@ -768,24 +769,33 @@ public class Main {
 				ctx.close();
 				return;
 			}
-			if (frame.text().equals("pong")) {
-				if (ctx.channel().hasAttr(PING_SCHEDULE)) ctx.channel().attr(PING_SCHEDULE).getAndSet(null).cancel(false);
-				ctx.channel().eventLoop().schedule(() -> {
-					if (ctx.channel().hasAttr(PING_SCHEDULE)) ctx.channel().attr(PING_SCHEDULE).getAndSet(null).cancel(false);
+			if (!handshakeReceived && frame.text().equals("handshake")) {
+            handshakeReceived = true;
+			if (ctx.channel().hasAttr(PING_SCHEDULE)) {
+					ctx.channel().attr(PING_SCHEDULE).get().cancel(false);
+				}
+				// Reschedule ping task
+				ctx.channel().attr(PING_SCHEDULE).set(ctx.executor().scheduleAtFixedRate(() -> {
 					if (ctx.channel().isActive()) {
 						ctx.writeAndFlush(new TextWebSocketFrame("ping"));
-						ctx.channel().attr(PING_SCHEDULE).set(ctx.channel().eventLoop().schedule(() -> {
-							ctx.close();
-						}, 10, TimeUnit.SECONDS));
 					} else {
 						ctx.close();
 					}
-				}, 10, TimeUnit.SECONDS);
+				}, 0, 30, TimeUnit.SECONDS));
 				return;
 			}
 			try {
 				out.add(gson.fromJson(frame.text(), JsonObject.class));
 			} catch (JsonSyntaxException ignored) {
+			}
+		}
+
+		@Override
+		public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+			super.handlerRemoved(ctx);
+			// Cancel ping task when handler is removed
+			if (ctx.channel().hasAttr(PING_SCHEDULE)) {
+				ctx.channel().attr(PING_SCHEDULE).get().cancel(false);
 			}
 		}
 	}

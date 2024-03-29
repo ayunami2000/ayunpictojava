@@ -56,7 +56,7 @@ let loaderFunc = function () {
         fill: 0xFFFFFF,
     }, {
         scaleMode: PIXI.SCALE_MODES.NEAREST,
-        mipmap: PIXI.MIPMAP_MODES.OFF,
+        mipmap: PIXI.MIPMAP_MODES.ON,
         chars: " 1234567890-=qwertyuiopasdfghjklzxcvbnm,./;’[]!@#$%^&*()_+QWERTYUIOPASDFGHJKLZXCVBNM<>?:~{}àáâäèéêëìíîïòóôöœùúûüçñßÀÁÂÄÈÉÊËÌÍÎÏÒÓÔÖŒÙÚÛÜÇÑ¡¿€¢£″'⁓~+×÷→←↑↓「」“”()<>{}•♨〒♭♪±\\°|／＼∞∴…™©®☸☹☺☻☼☁☂☃✉☎☄☰☱☲☳☴☵✜♠♦♥♣☶☷✫✲◇□△▽◎➔➕➖➗✬✱◆■▲▼✕あかさたなはまやらわいきしちにひみゆりをうくすつぬふむよるんえけせてねへめ！れ、おこそとのほも？ろ。－がざだばぎじぢびぐずづぶげぜでべごぞどぼぱぴぷぺぽぁゃゎぃゅぅっょぇぉアカサタナハマヤラワイキシチニヒミユリヲウクスツヌフムヨルンエケセテネヘメレオコソトノホモロガザダバギジヂビヴグズヅブゲゼデベゴゾドボパピプペポァヵャヮィュゥッョェヶォ",
         textureWidth: 2048,
         textureHeight: 2048,
@@ -158,12 +158,61 @@ loaderFunc = (loader, resources) => {
         if (e.target !== topyElem) topyElem.onpaste(e);
     };
 
-    let keyUpEv = function (e) {
+	//Lets use KeyUp for graphical states
+	let keyUpEv = function (e) {
+        if (e.ctrlKey) return;
+        if (!joinedRoom) return;
+        const key = e.key.replace("Backspace", "BACKSPACE").replace("Enter", "ENTER");
+		//If the keyboard is not emojis or jap crap
+		if (kbMode < 3) 
+		{
+			//If shift got lifted up, change the graphics
+			if (key === "Shift")
+			{		
+				pc_sprites.shift.alpha = 0;
+				pc_sprites.caps.alpha = 0;
+				kbMode = 0;
+			}
+			//Capslock is currently toggled on
+			if (e.getModifierState && e.getModifierState('CapsLock')) 
+			{
+				pc_sprites.shift.alpha = 0;
+				pc_sprites.caps.alpha = 1;
+				kbMode = 2;
+			} else if(key === "CapsLock") //caplock lifted, and nowtoggled off
+			{
+				pc_sprites.shift.alpha = 0;
+				pc_sprites.caps.alpha = 0;
+				kbMode = 0;
+			}
+		}
+	}
+
+	//Keydown is far more reliable than keyup
+    let keyDownEv = function (e) {
         if (e.ctrlKey) return;
         if (!joinedRoom) return;
         const key = e.key.replace("Backspace", "BACKSPACE").replace("Enter", "ENTER");
         if (key !== "Shift" && key !== "CapsLock" && (keys_NORMAL.includes(key) || keys_CAPS.includes(key) || keys_SHIFT.includes(key))) addCharacterDirect(key);
-        if (key === "ArrowUp") {
+		//If shift is currently helt down, and the keyboard mode is the US character set
+		if (key === "Shift")
+		{		
+			//Update graphics to shift mode
+			if (kbMode < 3) {
+				pc_sprites.shift.alpha = 1;
+				pc_sprites.caps.alpha = 0;
+				kbMode = 1;
+			}
+		}
+		//Enter now sends messages, unless shift is held then its a new line like most chat apps
+		if (key === "ENTER") 
+		{
+			if (!e.shiftKey) 
+			{
+				sendBtn.emit("pointerup");
+			}
+            
+		}else if (key === "ArrowUp") {
             sendBtn.emit("pointerup");
         } else if (key === "ArrowDown") {
             renewBtn.emit("pointerup");
@@ -227,6 +276,9 @@ loaderFunc = (loader, resources) => {
             }
         };
     }
+    window.onkeydown = function (e) {
+        if (e.target !== topyElem) keyDownEv(e);
+    };
     window.onkeyup = function (e) {
         if (e.target !== topyElem) keyUpEv(e);
     };
@@ -1242,21 +1294,29 @@ loaderFunc = (loader, resources) => {
     }
 
     function setupWebSocket() {
+		//Keeps the connection alive
         function heartbeat() {
             websocket.send("pong");
+			//console.log("Pong sent");
             clearTimeout(websocket.pingTimeout);
-            websocket.pingTimeout = setTimeout(() => {
-                websocket.terminate();
-            }, 11000);
         }
 
         websocket.onopen = function (event) {
             console.log("WebSocket connection established.", event);
-            heartbeat();
+
+			//Enable the button!
+			var logo_element = document.getElementById('logo');
+			logo_element.src = 'images/logo.png';
+			logo_element.title = 'Click to join PictoChat Session!';
+			logo_element.onclick = requestVerification;
+			
+            //heartbeat();
+			websocket.send("handshake");
         };
 
         websocket.onmessage = function (event) {
             if (event.data === "ping") {
+				//console.log("Ping received");
                 heartbeat();
             } else {
                 let oldScrollPos;
