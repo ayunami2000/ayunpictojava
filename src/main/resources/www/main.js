@@ -56,7 +56,7 @@ let loaderFunc = function () {
         fill: 0xFFFFFF,
     }, {
         scaleMode: PIXI.SCALE_MODES.NEAREST,
-        mipmap: PIXI.MIPMAP_MODES.OFF,
+        mipmap: PIXI.MIPMAP_MODES.ON,
         chars: " 1234567890-=qwertyuiopasdfghjklzxcvbnm,./;’[]!@#$%^&*()_+QWERTYUIOPASDFGHJKLZXCVBNM<>?:~{}àáâäèéêëìíîïòóôöœùúûüçñßÀÁÂÄÈÉÊËÌÍÎÏÒÓÔÖŒÙÚÛÜÇÑ¡¿€¢£″'⁓~+×÷→←↑↓「」“”()<>{}•♨〒♭♪±\\°|／＼∞∴…™©®☸☹☺☻☼☁☂☃✉☎☄☰☱☲☳☴☵✜♠♦♥♣☶☷✫✲◇□△▽◎➔➕➖➗✬✱◆■▲▼✕あかさたなはまやらわいきしちにひみゆりをうくすつぬふむよるんえけせてねへめ！れ、おこそとのほも？ろ。－がざだばぎじぢびぐずづぶげぜでべごぞどぼぱぴぷぺぽぁゃゎぃゅぅっょぇぉアカサタナハマヤラワイキシチニヒミユリヲウクスツヌフムヨルンエケセテネヘメレオコソトノホモロガザダバギジヂビヴグズヅブゲゼデベゴゾドボパピプペポァヵャヮィュゥッョェヶォ",
         textureWidth: 2048,
         textureHeight: 2048,
