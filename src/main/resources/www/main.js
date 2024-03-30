@@ -984,6 +984,7 @@ loaderFunc = (loader, resources) => {
             if (pc_sprites.textboxes[i].text !== "")
                 return false;
         drawHistory = cleanupDrawing(drawHistory);
+        if (drawHistory.length === 2 && (drawHistory[1].type === 6 || drawHistory[1].type === 7)) return true;
         return drawHistory.length <= 1;
     }
 
@@ -993,6 +994,7 @@ loaderFunc = (loader, resources) => {
             if (prevTextboxes[scrollPos][i].text !== "")
                 return false;
         prevDrawHistory[scrollPos] = cleanupDrawing(prevDrawHistory[scrollPos]);
+        if (prevDrawHistory[scrollPos].length === 2 && (prevDrawHistory[scrollPos][1].type === 6 || prevDrawHistory[scrollPos][1].type === 7)) return true;
         return prevDrawHistory[scrollPos].length <= 1;
     }
 
