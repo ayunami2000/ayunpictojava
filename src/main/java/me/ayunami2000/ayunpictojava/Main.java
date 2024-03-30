@@ -1610,7 +1610,6 @@ public class Main {
 											break;
 										case 0:
 											if (rainbow) {
-												g2d.setColor(Color.getHSBColor(rainbowDeg / 360F, 1F, 1F));
 												point = polyline.getCurrentPoint();
 												if (point != null) {
 													g2d.draw(polyline);
@@ -1618,6 +1617,7 @@ public class Main {
 													polyline.moveTo(point.getX(), point.getY());
 												}
 												rainbowDeg = (rainbowDeg + 12) % 360;
+												g2d.setColor(Color.getHSBColor(rainbowDeg / 360F, 1F, 1F));
 											}
 											polyline.lineTo(x, y);
 											break;
@@ -1626,42 +1626,42 @@ public class Main {
 											polyline.moveTo(x, y);
 											break;
 										case 3:
-											g2d.setStroke(stroke2);
 											point = polyline.getCurrentPoint();
 											if (point != null) {
 												g2d.draw(polyline);
 												polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
 												polyline.moveTo(point.getX(), point.getY());
 											}
+											g2d.setStroke(stroke2);
 											break;
 										case 4:
-											g2d.setStroke(stroke1);
 											point = polyline.getCurrentPoint();
 											if (point != null) {
 												g2d.draw(polyline);
 												polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
 												polyline.moveTo(point.getX(), point.getY());
 											}
+											g2d.setStroke(stroke1);
 											break;
 										case 5:
+											point = polyline.getCurrentPoint();
+											if (point != null) {
+												g2d.draw(polyline);
+												polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
+												polyline.moveTo(point.getX(), point.getY());
+											}
 											g2d.setColor(fgColor);
 											rainbow = false;
-											point = polyline.getCurrentPoint();
-											if (point != null) {
-												g2d.draw(polyline);
-												polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
-												polyline.moveTo(point.getX(), point.getY());
-											}
 											break;
 										case 6:
-											g2d.setColor(bgColor);
-											rainbow = false;
 											point = polyline.getCurrentPoint();
 											if (point != null) {
 												g2d.draw(polyline);
 												polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
 												polyline.moveTo(point.getX(), point.getY());
 											}
+											g2d.setColor(bgColor);
+											rainbow = false;
 											break;
 										case 7:
 											rainbow = true;

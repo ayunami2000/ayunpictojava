@@ -1538,8 +1538,11 @@ loaderFunc = (loader, resources) => {
                 passed = true;
             }
         }
-        if (!isStageEmpty() || passed === true) {
-            passed = true;
+        if (message.drawing.length === 2 && (message.drawing[1].type === 6 || message.drawing[1].type === 7)) {
+            return passed;
+        }
+        if (message.drawing.length > 1) {
+            return true;
         }
         return passed;
     }
