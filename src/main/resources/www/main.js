@@ -590,6 +590,42 @@ loaderFunc = (loader, resources) => {
         return sb;
     }
 
+    function constructMessageObject() {
+        let lowestY = 0;
+        let message = {player: playerData, drawing: [], textboxes: [], lines: 1};
+        drawHistory = cleanupDrawing(drawHistory);
+        for (let i = 0; i < drawHistory.length; i++) {
+            if (drawHistory[i].x < 0) drawHistory[i].x = 0;
+            if (drawHistory[i].y < 0) drawHistory[i].y = 0;
+            if (drawHistory[i].y > lowestY)
+                lowestY = drawHistory[i].y;
+        }
+        message.drawing = drawHistory;
+        for (let i = 0; i < pc_sprites.textboxes.length; i++) {
+            if (pc_sprites.textboxes[i].text !== "") {
+                let tbObj = {
+                    text: pc_sprites.textboxes[i].text,
+                    x: pc_sprites.textboxes[i].x / SCALE,
+                    y: pc_sprites.textboxes[i].y / SCALE
+                };
+                message.textboxes.push(tbObj);
+                if ((pc_sprites.textboxes[i].y / SCALE + 12) > lowestY) {
+                    lowestY = (pc_sprites.textboxes[i].y / SCALE + 12);
+                }
+            }
+        }
+        // console.log(lowestY);
+        if (lowestY > 226)
+            message.lines = 2;
+        if (lowestY > 240)
+            message.lines = 3;
+        if (lowestY > 256)
+            message.lines = 4;
+        if (lowestY > 274)
+            message.lines = 5;
+        return message;
+    }
+
     let dontAutoScroll = false;
 
     let doubleTapTimeout = -1;
@@ -923,20 +959,41 @@ loaderFunc = (loader, resources) => {
         redraw = true;
     }
 
+    function cleanupDrawing(drawing) {
+        let fard = '';
+        for (let i = 0; i < drawing.length; i++) {
+            fard += drawing[i].type;
+        }
+        fard = fard.replace(/([34]+)([34])|([567]+)([567])/g, (_, a, b, c, d) => '_'.repeat((a ? a : c).length) + (b ? b : d));
+        let prev = 5;
+        let prev2 = null;
+        return drawing.filter((v, i) => {
+            if (fard[i] === '_') return false;
+            if (v.type === prev || v.type === prev2) return false;
+            if (v.type === 3 || v.type === 4) {
+                prev2 = v.type;
+            } else if (v.type === 5 || v.type === 6 || v.type === 7) {
+                prev = v.type;
+            }
+            return true;
+        });
+    }
+
     function isStageEmpty() {
         for (let i = 0; i < pc_sprites.textboxes.length; i++)
             if (pc_sprites.textboxes[i].text !== "")
                 return false;
+        drawHistory = cleanupDrawing(drawHistory);
         return drawHistory.length <= 1;
-
     }
 
     function isPrevStageEmpty() {
-        for (let i = 0; i < prevTextboxes.length; i++)
-            if (prevTextboxes[i].text !== "")
+        if (!prevDrawHistory[scrollPos] || !prevTextboxes[scrollPos]) return true;
+        for (let i = 0; i < prevTextboxes[scrollPos].length; i++)
+            if (prevTextboxes[scrollPos][i].text !== "")
                 return false;
-        return prevDrawHistory.length <= 1;
-
+        prevDrawHistory[scrollPos] = cleanupDrawing(prevDrawHistory[scrollPos]);
+        return prevDrawHistory[scrollPos].length <= 1;
     }
 
     function addInitialTextboxes() {
@@ -965,22 +1022,25 @@ loaderFunc = (loader, resources) => {
     }
 
     function recordHistory(message) {
-        prevDrawHistory = message.drawing.slice();
-        prevTextboxes = message.textboxes.slice();
+        prevDrawHistory.length = pc_sprites.scrollContainer.children.length + 1;
+        prevTextboxes.length = pc_sprites.scrollContainer.children.length + 1;
+        prevDrawHistory[pc_sprites.scrollContainer.children.length] = message.drawing.slice();
+        prevTextboxes[pc_sprites.scrollContainer.children.length] = message.textboxes.slice();
     }
 
     function restoreHistory() {
-        console.log("Restoring History...", prevDrawHistory, prevTextboxes);
-        for (let i = 0; i < prevDrawHistory.length; i++) {
+        if (!prevDrawHistory[scrollPos] || !prevTextboxes[scrollPos]) return;
+        console.log("Restoring History...", prevDrawHistory[scrollPos], prevTextboxes[scrollPos]);
+        for (let i = 0; i < prevDrawHistory[scrollPos].length; i++) {
             let value = {
-                x: prevDrawHistory[i].x + pc_sprites.box.x / SCALE,
-                y: prevDrawHistory[i].y + pc_sprites.box.y / SCALE,
-                type: prevDrawHistory[i].type
+                x: prevDrawHistory[scrollPos][i].x + pc_sprites.box.x / SCALE,
+                y: prevDrawHistory[scrollPos][i].y + pc_sprites.box.y / SCALE,
+                type: prevDrawHistory[scrollPos][i].type
             };
             drawHistory.push(value);
         }
-        for (let i = 0; i < prevTextboxes.length; i++) {
-            let txt = prevTextboxes[i];
+        for (let i = 0; i < prevTextboxes[scrollPos].length; i++) {
+            let txt = prevTextboxes[scrollPos][i];
             let tb = new PIXI.BitmapText(txt.text, ndsFont);
             tb.x = txt.x;
             tb.y = txt.y;
@@ -988,6 +1048,15 @@ loaderFunc = (loader, resources) => {
             app.stage.addChild(pc_sprites.textboxes[pc_sprites.textboxes.length - 1]);
         }
         selectedTextbox = 0;
+        drawHistory.push({x: 0, y: 0, type: bigPenMode ? 3 : 4});
+        if (eraserPenMode) {
+            drawHistory.push({x: 0, y: 0, type: 6});
+        } else if (rainbowPenMode) {
+            drawHistory.push({x: 0, y: 0, type: 7});
+        } else {
+            drawHistory.push({x: 0, y: 0, type: 5});
+        }
+        drawHistory = cleanupDrawing(drawHistory);
         scaleStage();
         redraw = true;
     }
@@ -1023,6 +1092,7 @@ loaderFunc = (loader, resources) => {
         let graphics = new PIXI.Graphics();
         graphics.drawMode = 0;
         graphics.rainbowDeg = 0;
+        message.drawing = cleanupDrawing(message.drawing);
         for (let i = 0; i < message.drawing.length; i++) {
             let action = message.drawing[i];
             if (action == null) continue;
@@ -1040,8 +1110,8 @@ loaderFunc = (loader, resources) => {
                     break;
                 }
                 case 0: {
-                    graphics.lineTo(action.x, action.y);
                     if (graphics.drawMode === 0xffffff) graphics.rainbowDeg = (graphics.rainbowDeg + 12) % 360;
+                    graphics.lineTo(action.x, action.y);
                     break;
                 }
                 case 1: {
@@ -1387,7 +1457,7 @@ loaderFunc = (loader, resources) => {
                     case "sv_receivedMessage": {
                         let message = obj.message;
                         if (isMessageValid(message)) {
-                            console.log(message);
+                            // console.log(message);
                             recordHistory(message);
                             if (roomData.private && (gotFirstMsg === 0 || (gotFirstMsg === 2 && (message.textboxes[0].text.startsWith("Joined room: ")))) && message.textboxes[0].text.length > 6) {
                                 gotFirstMsg = 1;
@@ -1466,7 +1536,7 @@ loaderFunc = (loader, resources) => {
                 passed = true;
             }
         }
-        if (message.drawing.length > 1 || passed === true) {
+        if (!isStageEmpty() || passed === true) {
             passed = true;
         }
         return passed;
@@ -1720,6 +1790,7 @@ loaderFunc = (loader, resources) => {
         pc_sprites.drawing.clear();
         pc_sprites.drawing.drawMode = 0;
         pc_sprites.drawing.rainbowDeg = 0;
+        drawHistory = cleanupDrawing(drawHistory);
         for (let i = 0; i < drawHistory.length; i++) {
             let action = drawHistory[i];
             switch (action.type) {
@@ -1821,41 +1892,6 @@ function updatePlayerData() {
         if (app.stage.children[i].spriteType === "kb")
             app.stage.children[i].tint = playerData.color;
     }
-}
-
-function constructMessageObject() {
-    let lowestY = 0;
-    let message = {player: playerData, drawing: [], textboxes: [], lines: 1};
-    for (let i = 0; i < drawHistory.length; i++) {
-        if (drawHistory[i].x < 0) drawHistory[i].x = 0;
-        if (drawHistory[i].y < 0) drawHistory[i].y = 0;
-        if (drawHistory[i].y > lowestY)
-            lowestY = drawHistory[i].y;
-    }
-    message.drawing = drawHistory;
-    for (let i = 0; i < pc_sprites.textboxes.length; i++) {
-        if (pc_sprites.textboxes[i].text !== "") {
-            let tbObj = {
-                text: pc_sprites.textboxes[i].text,
-                x: pc_sprites.textboxes[i].x / SCALE,
-                y: pc_sprites.textboxes[i].y / SCALE
-            };
-            message.textboxes.push(tbObj);
-            if ((pc_sprites.textboxes[i].y / SCALE + 12) > lowestY) {
-                lowestY = (pc_sprites.textboxes[i].y / SCALE + 12);
-            }
-        }
-    }
-    // console.log(lowestY);
-    if (lowestY > 225)
-        message.lines = 2;
-    if (lowestY > 240)
-        message.lines = 3;
-    if (lowestY > 256)
-        message.lines = 4;
-    if (lowestY > 273)
-        message.lines = 5;
-    return message;
 }
 
 // https://stackoverflow.com/questions/6443990/javascript-calculate-brighter-colour

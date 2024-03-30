@@ -1121,7 +1121,7 @@ public class Main {
 						JsonObject textbox = new JsonObject();
 						textbox.addProperty("x", 113);
 						textbox.addProperty("y", 211);
-						textbox.addProperty("text", "Ratelimited: Please wait " + (ctx.channel().attr(RATELIMIT).get() / 1000) + "s");
+						textbox.addProperty("text", "Ratelimited: Please wait " + (1 + (int) (ctx.channel().attr(COOLDOWN).get() - System.currentTimeMillis()) / 1000) + "s");
 						textboxes.add(textbox);
 						message.add("textboxes", textboxes);
 						message.addProperty("lines", 1);
@@ -1133,7 +1133,7 @@ public class Main {
 						ctx.writeAndFlush(jsonObject);
 						return;
 					} else {
-						if (System.currentTimeMillis() - ctx.channel().attr(COOLDOWN).get() < ctx.channel().attr(RATELIMIT).get() * 2) {
+						if (System.currentTimeMillis() - ctx.channel().attr(COOLDOWN).get() < 1000) {
 							ctx.channel().attr(RATELIMIT).set(Math.min(32000, ctx.channel().attr(RATELIMIT).get() * 2));
 						} else {
 							ctx.channel().attr(RATELIMIT).set(1000);
@@ -1610,6 +1610,7 @@ public class Main {
 											break;
 										case 0:
 											if (rainbow) {
+												g2d.setColor(Color.getHSBColor(rainbowDeg / 360F, 1F, 1F));
 												point = polyline.getCurrentPoint();
 												if (point != null) {
 													g2d.draw(polyline);
@@ -1617,7 +1618,6 @@ public class Main {
 													polyline.moveTo(point.getX(), point.getY());
 												}
 												rainbowDeg = (rainbowDeg + 12) % 360;
-												g2d.setColor(Color.getHSBColor(rainbowDeg / 360F, 1F, 1F));
 											}
 											polyline.lineTo(x, y);
 											break;
@@ -1626,42 +1626,42 @@ public class Main {
 											polyline.moveTo(x, y);
 											break;
 										case 3:
+											g2d.setStroke(stroke2);
 											point = polyline.getCurrentPoint();
 											if (point != null) {
 												g2d.draw(polyline);
 												polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
 												polyline.moveTo(point.getX(), point.getY());
 											}
-											g2d.setStroke(stroke2);
 											break;
 										case 4:
+											g2d.setStroke(stroke1);
 											point = polyline.getCurrentPoint();
 											if (point != null) {
 												g2d.draw(polyline);
 												polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
 												polyline.moveTo(point.getX(), point.getY());
 											}
-											g2d.setStroke(stroke1);
 											break;
 										case 5:
-											point = polyline.getCurrentPoint();
-											if (point != null) {
-												g2d.draw(polyline);
-												polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
-												polyline.moveTo(point.getX(), point.getY());
-											}
 											g2d.setColor(fgColor);
 											rainbow = false;
-											break;
-										case 6:
 											point = polyline.getCurrentPoint();
 											if (point != null) {
 												g2d.draw(polyline);
 												polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
 												polyline.moveTo(point.getX(), point.getY());
 											}
+											break;
+										case 6:
 											g2d.setColor(bgColor);
 											rainbow = false;
+											point = polyline.getCurrentPoint();
+											if (point != null) {
+												g2d.draw(polyline);
+												polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
+												polyline.moveTo(point.getX(), point.getY());
+											}
 											break;
 										case 7:
 											rainbow = true;
