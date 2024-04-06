@@ -87,6 +87,7 @@ app.loader.add('connection_bad', 'images/connection_bad.png');
 loaderFunc = (loader, resources) => {
     let wsUrl = "ws" + window.location.href.slice(4);
     if (window.location.hash) wsUrl = wsUrl.slice(0, wsUrl.indexOf(window.location.hash));
+    if (window.location.search) wsUrl = wsUrl.slice(0, wsUrl.indexOf(window.location.search));
     websocket = new WebSocket(wsUrl);
 
     document.getElementById("root").appendChild(app.view);

@@ -125,7 +125,10 @@ public class HttpStaticFileServerHandler extends SimpleChannelInboundHandler<Ful
         }
 
         final boolean keepAlive = HttpUtil.isKeepAlive(request);
-        final String uri = request.uri();
+        String uri = request.uri();
+        if (uri.contains("?")) {
+            uri = uri.substring(0, uri.indexOf('?'));
+        }
         final String path = sanitizeUri(uri);
         if (path == null) {
             sendError(ctx, FORBIDDEN);
