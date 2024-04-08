@@ -52,6 +52,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 public class Main {
 	private static final Gson gson = new Gson();
@@ -62,6 +63,7 @@ public class Main {
 	private static String channel2 = null;
 	private static String channel3 = null;
 	private static String channel4 = null;
+	private static String channelConsole = null;
 
 	// https://stackoverflow.com/a/24316335
 	public static void copyFromJar(String source, final Path target) throws URISyntaxException, IOException {
@@ -306,6 +308,10 @@ public class Main {
 				String token = System.getenv("PICTOJAVA_TOKEN");
 				if (token == null || token.isEmpty()) token = discordJson.get("token").getAsString();
 				JsonArray channels = discordJson.getAsJsonArray("channels");
+				JsonElement channelConsoleJsonElement = discordJson.get("consoleChannel");
+				if (channelConsoleJsonElement != null) {
+					channelConsole = channelConsoleJsonElement.getAsString();
+				}
 				if (!channels.isEmpty()) {
 					channel1 = channels.get(0).getAsString();
 					if (channels.size() > 1) {
@@ -486,6 +492,11 @@ public class Main {
 								} else if (channelId.equals(channel4)) {
 									USERS = USERS_D;
 								} else {
+									if (channelId.equals(channelConsole)) {
+										if (!handleConsoleCommand(event.getMessage().getContentStripped().trim(), (String resp) -> event.getMessage().reply(resp).queue())) {
+											event.getMessage().reply("You can't stop the server from here!").queue();
+										}
+									}
 									return;
 								}
 								if (listCmd) {
@@ -648,108 +659,7 @@ public class Main {
 		boolean running = true;
 		while (running) {
 			System.out.print(">");
-			String[] cmd = consoleReader.readLine().trim().split(" ");
-			boolean ban;
-			switch (cmd[0].toLowerCase()) {
-				case "help":
-					System.out.println("Commands: help ; stop ; ban ; banip ; unbanip ; kick ; kickip");
-					break;
-				case "stop":
-					System.out.println("Stopping!");
-					running = false;
-					break;
-				case "ban":
-				case "kick":
-					ban = cmd[0].equalsIgnoreCase("ban");
-					if (cmd.length < 3) {
-						if (ban) {
-							System.out.println("Info: Bans the specified user's IP.\nUsage: ban <name> <room>");
-						} else {
-							System.out.println("Info: Kicks the specified user.\nUsage: kick <name> <room>");
-						}
-						break;
-					}
-					Map<JsonObject, ChannelHandlerContext> USERS = getUsersForRoomId(cmd[2]);
-					if (USERS == null) {
-						System.out.println("Invalid room! Please specify one of: \"room_a\" ; \"room_b\" ; \"room_c\" ; \"room_d\" ; \"room_e\"");
-						break;
-					}
-					boolean done = false;
-					for (JsonObject player : USERS.keySet()) {
-						if (player.get("name").getAsString().equals(cmd[1])) {
-							done = true;
-							ChannelHandlerContext ctx = USERS.get(player);
-							InetAddress ip = ((InetSocketAddress) ctx.channel().remoteAddress()).getAddress();
-							System.out.println((ban ? "Bann" : "Kick") + "ing IP: " + ip.getHostAddress());
-							if (ban) banIP(ip, false);
-							ctx.close();
-							break;
-						}
-					}
-					if (!done)
-						for (JsonObject player : USERS.keySet()) {
-							if (player.get("name").getAsString().equalsIgnoreCase(cmd[1])) {
-								done = true;
-								ChannelHandlerContext ctx = USERS.get(player);
-								InetAddress ip = ((InetSocketAddress) ctx.channel().remoteAddress()).getAddress();
-								System.out.println((ban ? "Bann" : "Kick") + "ing IP: " + ip.getHostAddress());
-								if (ban) banIP(ip, false);
-								ctx.close();
-							}
-						}
-					if (done) {
-						System.out.println("Done!");
-					} else {
-						System.out.println("Nobody with that name was found in the specified room!");
-					}
-					break;
-				case "banip":
-				case "kickip":
-					ban = cmd[0].equalsIgnoreCase("banip");
-					if (cmd.length < 2) {
-						if (ban) {
-							System.out.println("Info: Bans the specified IP.\nUsage: banip <ip>");
-						} else {
-							System.out.println("Info: Kicks the specified IP.\nUsage: kick <ip>");
-						}
-						break;
-					}
-					try {
-						InetAddress ip = InetAddress.getByName(cmd[1]);
-						for (ChannelHandlerContext ctx : USERS_A.values())
-							if (((InetSocketAddress) ctx.channel().remoteAddress()).getAddress().equals(ip))
-								ctx.close();
-						for (ChannelHandlerContext ctx : USERS_B.values())
-							if (((InetSocketAddress) ctx.channel().remoteAddress()).getAddress().equals(ip))
-								ctx.close();
-						for (ChannelHandlerContext ctx : USERS_C.values())
-							if (((InetSocketAddress) ctx.channel().remoteAddress()).getAddress().equals(ip))
-								ctx.close();
-						for (ChannelHandlerContext ctx : USERS_D.values())
-							if (((InetSocketAddress) ctx.channel().remoteAddress()).getAddress().equals(ip))
-								ctx.close();
-						if (ban) banIP(ip, false);
-						System.out.println("Done!");
-					} catch (UnknownHostException e) {
-						System.out.println("That IP is invalid!");
-					}
-					break;
-				case "unban":
-				case "unbanip":
-					if (cmd.length < 2) {
-						System.out.println("Info: Unbans the specified IP.\nUsage: " + cmd[0].toLowerCase() + " <ip>");
-						break;
-					}
-					try {
-						banIP(InetAddress.getByName(cmd[1]), true);
-						System.out.println("Done!");
-					} catch (UnknownHostException e) {
-						System.out.println("That IP is invalid!");
-					}
-					break;
-				default:
-					System.out.println("Unknown command! Try \"help\" for help.");
-			}
+			running = handleConsoleCommand(consoleReader.readLine(), (String output) -> System.out.println(output));
 		}
 
 		System.exit(0); // fack u
@@ -757,6 +667,116 @@ public class Main {
 		workerGroup.shutdownGracefully();
 		bossGroup.shutdownGracefully();
 		jda.shutdown();
+	}
+
+	// takes in a command line and a way to print output, returns true for normal commands or unrecognized input and false for an attempt to stop the server
+	private static boolean handleConsoleCommand(String cmdstr, Consumer<String> feedbackChannel) {
+		if(cmdstr.startsWith("#")) {
+			// so people can type human-readable textin the console channels, e.g. to justify a moderation decision
+			return true;
+		}
+		String[] cmd = cmdstr.trim().split(" ");
+		boolean ban;
+		switch (cmd[0].toLowerCase()) {
+			case "help":
+				feedbackChannel.accept("Commands: help ; stop ; ban ; banip ; unbanip ; kick ; kickip");
+				return true;
+			case "stop":
+				feedbackChannel.accept("Trying to stop the server...");
+				return false;
+			case "ban":
+			case "kick":
+				ban = cmd[0].equalsIgnoreCase("ban");
+				if (cmd.length < 3) {
+					if (ban) {
+						feedbackChannel.accept("Info: Bans the specified user's IP.\nUsage: ban <name> <room>");
+					} else {
+						feedbackChannel.accept("Info: Kicks the specified user.\nUsage: kick <name> <room>");
+					}
+					return true;
+				}
+				Map<JsonObject, ChannelHandlerContext> USERS = getUsersForRoomId(cmd[2]);
+				if (USERS == null) {
+					feedbackChannel.accept("Invalid room! Please specify one of: \"room_a\" ; \"room_b\" ; \"room_c\" ; \"room_d\" ; \"room_e\"");
+					return true;
+				}
+				boolean done = false;
+				for (JsonObject player : USERS.keySet()) {
+					if (player.get("name").getAsString().equals(cmd[1])) {
+						done = true;
+						ChannelHandlerContext ctx = USERS.get(player);
+						InetAddress ip = ((InetSocketAddress) ctx.channel().remoteAddress()).getAddress();
+						feedbackChannel.accept((ban ? "Bann" : "Kick") + "ing IP: " + ip.getHostAddress());
+						if (ban) banIP(ip, false);
+						ctx.close();
+						return true;
+					}
+				}
+				if (!done)
+					for (JsonObject player : USERS.keySet()) {
+						if (player.get("name").getAsString().equalsIgnoreCase(cmd[1])) {
+							done = true;
+							ChannelHandlerContext ctx = USERS.get(player);
+							InetAddress ip = ((InetSocketAddress) ctx.channel().remoteAddress()).getAddress();
+							feedbackChannel.accept((ban ? "Bann" : "Kick") + "ing IP: " + ip.getHostAddress());
+							if (ban) banIP(ip, false);
+							ctx.close();
+						}
+					}
+				if (done) {
+					feedbackChannel.accept("Done!");
+				} else {
+					feedbackChannel.accept("Nobody with that name was found in the specified room!");
+				}
+				return true;
+			case "banip":
+			case "kickip":
+				ban = cmd[0].equalsIgnoreCase("banip");
+				if (cmd.length < 2) {
+					if (ban) {
+						feedbackChannel.accept("Info: Bans the specified IP.\nUsage: banip <ip>");
+					} else {
+						feedbackChannel.accept("Info: Kicks the specified IP.\nUsage: kick <ip>");
+					}
+					return true;
+				}
+				try {
+					InetAddress ip = InetAddress.getByName(cmd[1]);
+					for (ChannelHandlerContext ctx : USERS_A.values())
+						if (((InetSocketAddress) ctx.channel().remoteAddress()).getAddress().equals(ip))
+							ctx.close();
+					for (ChannelHandlerContext ctx : USERS_B.values())
+						if (((InetSocketAddress) ctx.channel().remoteAddress()).getAddress().equals(ip))
+							ctx.close();
+					for (ChannelHandlerContext ctx : USERS_C.values())
+						if (((InetSocketAddress) ctx.channel().remoteAddress()).getAddress().equals(ip))
+							ctx.close();
+					for (ChannelHandlerContext ctx : USERS_D.values())
+						if (((InetSocketAddress) ctx.channel().remoteAddress()).getAddress().equals(ip))
+							ctx.close();
+					if (ban) banIP(ip, false);
+					feedbackChannel.accept("Done!");
+				} catch (UnknownHostException e) {
+					feedbackChannel.accept("That IP is invalid!");
+				}
+				return true;
+			case "unban":
+			case "unbanip":
+				if (cmd.length < 2) {
+					feedbackChannel.accept("Info: Unbans the specified IP.\nUsage: " + cmd[0].toLowerCase() + " <ip>");
+					return true;
+				}
+				try {
+					banIP(InetAddress.getByName(cmd[1]), true);
+					feedbackChannel.accept("Done!");
+				} catch (UnknownHostException e) {
+					feedbackChannel.accept("That IP is invalid!");
+				}
+				return true;
+			default:
+				feedbackChannel.accept("Unknown command! Try \"help\" for help.");
+				return true;
+		}
 	}
 
 	static class WebSocketFrameToJsonObjectDecoder extends MessageToMessageDecoder<TextWebSocketFrame> {
