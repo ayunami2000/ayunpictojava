@@ -344,25 +344,10 @@
                 clearInterval(interval);
                 document.getElementById("intro").style.display = "none";
                 if (window.location.hash && window.location.hash.length === 7) {
-                    const code = window.location.hash.slice(1);
-                    for (let i = 0; i < pc_sprites.roomButtons.length; i++) {
-                        if (!pc_sprites.roomButtons[i].pcText) {
-                            pc_sprites.roomButtons[i].emit("pointerup");
-                            break;
-                        }
-                    }
+                    pc_sprites.roomButtons[pc_sprites.roomButtons.length - 1].emit("pointerup");
                     let int = setInterval(function () {
                         if (joinedRoom) {
                             clearInterval(int);
-                            websocket.send(JSON.stringify({
-                                type: "cl_sendMessage",
-                                message: {
-                                    player: {name: "", color: 0},
-                                    textboxes: [{x: 0, y: 0, text: "!join " + code}],
-                                    lines: 1,
-                                    drawing: [{x: 0, y: 0, type: 3}]
-                                }
-                            }));
                             gotFirstMsg = 2;
                         }
                     }, 100);
@@ -407,10 +392,6 @@
             scaleStage();
         }
     }
-
-    window.onhashchange = function () {
-        window.location.reload();
-    };
 </script>
 
 </body>

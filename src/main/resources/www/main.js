@@ -305,8 +305,12 @@ loaderFunc = (loader, resources) => {
             roomButton.on('pointerup', function () {
                 this.filters = [new PIXI.filters.ColorMatrixFilter()];
                 this.blendMode = PIXI.BLEND_MODES.NORMAL;
-                let obj = {type: 'cl_joinRoom', player: playerData, id: this.roomId};
+                const f = this.roomId === "room_e" && window.location.hash && window.location.hash.length === 7;
+                let obj = {type: 'cl_joinRoom', player: playerData, id: f ? window.location.hash.slice(1) : this.roomId};
                 websocket.send(JSON.stringify(obj));
+                if (f) {
+                    gotFirstMsg = 2;
+                }
             });
             roomButton.on('pointerupoutside', function () {
                 this.filters = [new PIXI.filters.ColorMatrixFilter()];
@@ -1465,6 +1469,7 @@ loaderFunc = (loader, resources) => {
                             if (roomData.private && (gotFirstMsg === 0 || (gotFirstMsg === 2 && (message.textboxes[0].text.startsWith("Joined room: ")))) && message.textboxes[0].text.length > 6) {
                                 gotFirstMsg = 1;
                                 const code = message.textboxes[0].text.slice(message.textboxes[0].text.length - 6);
+                                window.location.hash = code;
                                 pc_sprites.copyprivate.on("pointerup", function() {
                                     navigator.clipboard.writeText("http" + wsUrl.slice(2) + "#" + code).then(function() {
                                         sounds.retrieve.play();

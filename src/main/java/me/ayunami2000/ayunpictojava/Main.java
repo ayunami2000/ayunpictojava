@@ -25,6 +25,8 @@ import net.dv8tion.jda.api.exceptions.InvalidTokenException;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.api.utils.FileUpload;
+import net.sourceforge.tess4j.Tesseract;
+import net.sourceforge.tess4j.TesseractException;
 import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.Dsl;
 import org.jetbrains.annotations.NotNull;
@@ -62,6 +64,13 @@ public class Main {
 	private static String channel2 = null;
 	private static String channel3 = null;
 	private static String channel4 = null;
+	private static String chatFilterKey = null;
+	private static String[] chatFilterLangs = null;
+	private static String[] chatFilterAttrs = null;
+	private static String[] chatFilterRooms = null;
+	private static float chatFilterThresh = 0.65f;
+
+	private static Tesseract tess = null;
 
 	// https://stackoverflow.com/a/24316335
 	public static void copyFromJar(String source, final Path target) throws URISyntaxException, IOException {
@@ -279,6 +288,11 @@ public class Main {
 		reader.close();
 		if (tcSecret == null || tcSecret.isEmpty()) tcSecret = settingsJson.has("tripcode_secret") ? settingsJson.get("tripcode_secret").getAsString() : "";
 		int port = 8080;
+		if (settingsJson.has("ocr") && settingsJson.get("ocr").getAsBoolean()) {
+			tess = new Tesseract();
+			tess.setDatapath("./tessdata");
+			tess.setLanguage("eng");
+		}
 		if (settingsJson.has("port")) port = settingsJson.get("port").getAsInt();
 		String host = "127.0.0.1";
 		if (settingsJson.has("host")) host = settingsJson.get("host").getAsString();
@@ -588,6 +602,46 @@ public class Main {
 				}
 			}
 		}
+		if (settingsJson.has("chat_filter")) {
+			JsonObject chatFilterJson = settingsJson.getAsJsonObject("chat_filter");
+			if (chatFilterJson.has("enabled") && chatFilterJson.get("enabled").getAsBoolean() && chatFilterJson.has("key")) {
+				chatFilterKey = System.getenv("PICTOJAVA_CHAT_FILTER_KEY");
+				if (chatFilterKey == null || chatFilterKey.isEmpty()) chatFilterKey = chatFilterJson.get("key").getAsString();
+				JsonElement tmp1;
+				JsonArray tmp2;
+				if (chatFilterJson.has("languages") && (tmp1 = chatFilterJson.get("languages")).isJsonArray() && !(tmp2 = tmp1.getAsJsonArray()).isEmpty()) {
+					Set<String> langs = new HashSet<>();
+					for (JsonElement jsonElement : tmp2) {
+						langs.add(jsonElement.getAsString());
+					}
+					chatFilterLangs = langs.toArray(new String[0]);
+				} else {
+					chatFilterLangs = new String[] { "en" };
+				}
+				if (chatFilterJson.has("attributes") && (tmp1 = chatFilterJson.get("attributes")).isJsonArray() && !(tmp2 = tmp1.getAsJsonArray()).isEmpty()) {
+					Set<String> attrs = new HashSet<>();
+					for (JsonElement jsonElement : tmp2) {
+						attrs.add(jsonElement.getAsString());
+					}
+					chatFilterAttrs = attrs.toArray(new String[0]);
+				} else {
+					chatFilterAttrs = new String[] { "PROFANITY" };
+				}
+				if (chatFilterJson.has("rooms") && (tmp1 = chatFilterJson.get("rooms")).isJsonArray() && !(tmp2 = tmp1.getAsJsonArray()).isEmpty()) {
+					Set<String> rooms = new HashSet<>();
+					for (JsonElement jsonElement : tmp2) {
+						rooms.add(jsonElement.getAsString());
+					}
+					chatFilterRooms = rooms.toArray(new String[0]);
+				} else {
+					chatFilterRooms = new String[] { "room_a", "room_b" };
+				}
+				JsonPrimitive tmp3;
+				if (chatFilterJson.has("threshold") && (tmp1 = chatFilterJson.get("threshold")).isJsonPrimitive() && (tmp3 = tmp1.getAsJsonPrimitive()).isNumber()) {
+					chatFilterThresh = tmp3.getAsNumber().floatValue();
+				}
+			}
+		}
 		EventLoopGroup bossGroup = new NioEventLoopGroup();
 		EventLoopGroup workerGroup = new NioEventLoopGroup();
 		ServerBootstrap b = new ServerBootstrap();
@@ -609,6 +663,39 @@ public class Main {
 									Field remoteAddressField = AbstractChannel.class.getDeclaredField("remoteAddress");
 									remoteAddressField.setAccessible(true);
 									remoteAddressField.set(ctx.channel(), new InetSocketAddress(ip, 0));
+								}
+								int i = 0;
+								for (ChannelHandlerContext ctxx : USERS_A.values()) {
+									InetAddress ipp = ((InetSocketAddress) ctxx.channel().remoteAddress()).getAddress();
+									if (ipp.getHostAddress().equalsIgnoreCase(ip)) i++;
+									if (i >= 5) {
+										ctx.close();
+										return;
+									}
+								}
+								for (ChannelHandlerContext ctxx : USERS_B.values()) {
+									InetAddress ipp = ((InetSocketAddress) ctxx.channel().remoteAddress()).getAddress();
+									if (ipp.getHostAddress().equalsIgnoreCase(ip)) i++;
+									if (i >= 5) {
+										ctx.close();
+										return;
+									}
+								}
+								for (ChannelHandlerContext ctxx : USERS_C.values()) {
+									InetAddress ipp = ((InetSocketAddress) ctxx.channel().remoteAddress()).getAddress();
+									if (ipp.getHostAddress().equalsIgnoreCase(ip)) i++;
+									if (i >= 5) {
+										ctx.close();
+										return;
+									}
+								}
+								for (ChannelHandlerContext ctxx : USERS_D.values()) {
+									InetAddress ipp = ((InetSocketAddress) ctxx.channel().remoteAddress()).getAddress();
+									if (ipp.getHostAddress().equalsIgnoreCase(ip)) i++;
+									if (i >= 5) {
+										ctx.close();
+										return;
+									}
 								}
 								for (JsonElement jsonElement : banList)
 									if (jsonElement.getAsString().equals(ip)) {
@@ -972,7 +1059,17 @@ public class Main {
 					if (!secret.isEmpty()) {
 						String token = jsonObject.get("token").getAsString();
 						try (AsyncHttpClient asyncHttpClient = Dsl.asyncHttpClient()) {
+							/*
 							InputStream is = asyncHttpClient.preparePost("https://challenges.cloudflare.com/turnstile/v0/siteverify").addFormParam("secret", secret).addFormParam("response", token).execute().toCompletableFuture().join().getResponseBodyAsStream();
+							JsonObject resp = gson.fromJson(new InputStreamReader(is), JsonObject.class);
+							is.close();
+							if (!resp.has("success") || !resp.get("success").getAsBoolean()) {
+								ctx.close();
+								return;
+							}
+							*/
+							String bdy = "response=" + token + "&secret=" + secret;
+							InputStream is = asyncHttpClient.preparePost("https://hcaptcha.com/siteverify").setHeader("Content-Type", "application/x-www-form-urlencoded").setHeader("Content-Length", "" + bdy.length()).setBody(bdy).execute().toCompletableFuture().join().getResponseBodyAsStream();
 							JsonObject resp = gson.fromJson(new InputStreamReader(is), JsonObject.class);
 							is.close();
 							if (!resp.has("success") || !resp.get("success").getAsBoolean()) {
@@ -1027,7 +1124,7 @@ public class Main {
 					if (!ctx.channel().hasAttr(JOIN_COOLDOWN)) ctx.channel().attr(JOIN_COOLDOWN).set(0L);
 					if (ctx.channel().attr(JOIN_COOLDOWN).get() + 5000L > System.currentTimeMillis()) return;
 					roomId = jsonObject.get("id").getAsString();
-					if (roomId.equals("room_e")) {
+					if (!roomId.equals("room_a") && !roomId.equals("room_b") && !roomId.equals("room_c") && !roomId.equals("room_d")) {
 						res = new JsonObject();
 						res.addProperty("type", "sv_roomData");
 						res.addProperty("id", "room_e");
@@ -1048,12 +1145,26 @@ public class Main {
 						textbox.addProperty("x", 113);
 						textbox.addProperty("y", 211);
 						String privRoomId;
-						do {
-							privRoomId = genRoomCode();
-						} while (ROOM_CODES.containsKey(privRoomId));
-						Map<JsonObject, ChannelHandlerContext> map = new ConcurrentHashMap<>();
-						map.put(ctx.channel().attr(PLAYER_DATA).get(), ctx);
-						ROOM_CODES.put(privRoomId, map);
+						if (roomId.equals("room_e")) {
+							do {
+								privRoomId = genRoomCode();
+							} while (ROOM_CODES.containsKey(privRoomId));
+						} else {
+							privRoomId = roomId;
+							roomId = "room_e";
+							if (privRoomId.length() != 6 || !privRoomId.replaceAll("[^A-Za-z0-9]", "").equalsIgnoreCase(privRoomId)) {
+								// todo: tell user their code is invalid
+								ctx.close();
+								return;
+							}
+						}
+						if (ROOM_CODES.containsKey(privRoomId)) {
+							ROOM_CODES.get(privRoomId).put(ctx.channel().attr(PLAYER_DATA).get(), ctx);
+						} else {
+							Map<JsonObject, ChannelHandlerContext> map = new ConcurrentHashMap<>();
+							map.put(ctx.channel().attr(PLAYER_DATA).get(), ctx);
+							ROOM_CODES.put(privRoomId, map);
+						}
 						ctx.channel().attr(PRIVATE_ROOM).set(privRoomId);
 						ctx.channel().attr(ROOM_ID).set(roomId);
 						textbox.addProperty("text", "Your room code is: " + privRoomId);
@@ -1071,6 +1182,11 @@ public class Main {
 						message.add("player", player);
 						jsonObject.add("message", message);
 						ctx.writeAndFlush(jsonObject);
+						res = new JsonObject();
+						res.addProperty("type", "sv_playerJoined");
+						res.add("player", ctx.channel().attr(PLAYER_DATA).get());
+						res.addProperty("id", roomId);
+						sendToOthers(player, res, ROOM_CODES.get(privRoomId));
 						return;
 					}
 					USERS = getUsersForRoomId(roomId);
@@ -1215,89 +1331,15 @@ public class Main {
 							return;
 						} else if (textRaw.toLowerCase().startsWith("!join ")) {
 							String privRoomId = textRaw.replace("\n", "").substring(6, Math.min(12, textRaw.length())).toUpperCase();
-							if (ROOM_CODES.containsKey(privRoomId)) {
-								if (privRoomId.equals(ctx.channel().attr(PRIVATE_ROOM).get())) {
-									jsonObject = new JsonObject();
-									jsonObject.addProperty("type", "sv_receivedMessage");
-									JsonObject message = new JsonObject();
-									JsonArray drawings = new JsonArray();
-									JsonObject drawing = new JsonObject();
-									drawing.addProperty("x", 0);
-									drawing.addProperty("y", 0);
-									drawing.addProperty("type", 3);
-									drawings.add(drawing);
-									message.add("drawing", drawings);
-									textboxes = new JsonArray();
-									JsonObject textbox = new JsonObject();
-									textbox.addProperty("x", 113);
-									textbox.addProperty("y", 211);
-									textbox.addProperty("text", "Already there!");
-									textboxes.add(textbox);
-									message.add("textboxes", textboxes);
-									message.addProperty("lines", 1);
-									player = new JsonObject();
-									player.addProperty("name", "[SERVER]");
-									player.addProperty("color", 51356);
-									message.add("player", player);
-									jsonObject.add("message", message);
-									ctx.writeAndFlush(jsonObject);
+							if (!ROOM_CODES.containsKey(privRoomId)) {
+								if (privRoomId.length() != 6 || !privRoomId.replaceAll("[^A-Za-z0-9]", "").equalsIgnoreCase(privRoomId)) {
+									// todo: blablabla
+									ctx.close();
 									return;
 								}
-								if (ROOM_CODES.get(privRoomId).size() >= 16) {
-									jsonObject = new JsonObject();
-									jsonObject.addProperty("type", "sv_receivedMessage");
-									JsonObject message = new JsonObject();
-									JsonArray drawings = new JsonArray();
-									JsonObject drawing = new JsonObject();
-									drawing.addProperty("x", 0);
-									drawing.addProperty("y", 0);
-									drawing.addProperty("type", 3);
-									drawings.add(drawing);
-									message.add("drawing", drawings);
-									textboxes = new JsonArray();
-									JsonObject textbox = new JsonObject();
-									textbox.addProperty("x", 113);
-									textbox.addProperty("y", 211);
-									textbox.addProperty("text", "Room is full!");
-									textboxes.add(textbox);
-									message.add("textboxes", textboxes);
-									message.addProperty("lines", 1);
-									player = new JsonObject();
-									player.addProperty("name", "[SERVER]");
-									player.addProperty("color", 51356);
-									message.add("player", player);
-									jsonObject.add("message", message);
-									ctx.writeAndFlush(jsonObject);
-									return;
-								}
-								finalPlayer = ctx.channel().attr(PLAYER_DATA).get();
-								if (ROOM_CODES.get(privRoomId).keySet().stream().anyMatch(jsonObject1 -> jsonObject1.get("name").getAsString().equals(finalPlayer.get("name").getAsString()))) {
-									jsonObject = new JsonObject();
-									jsonObject.addProperty("type", "sv_receivedMessage");
-									JsonObject message = new JsonObject();
-									JsonArray drawings = new JsonArray();
-									JsonObject drawing = new JsonObject();
-									drawing.addProperty("x", 0);
-									drawing.addProperty("y", 0);
-									drawing.addProperty("type", 3);
-									drawings.add(drawing);
-									message.add("drawing", drawings);
-									textboxes = new JsonArray();
-									JsonObject textbox = new JsonObject();
-									textbox.addProperty("x", 113);
-									textbox.addProperty("y", 211);
-									textbox.addProperty("text", "Duplicate name!");
-									textboxes.add(textbox);
-									message.add("textboxes", textboxes);
-									message.addProperty("lines", 1);
-									player = new JsonObject();
-									player.addProperty("name", "[SERVER]");
-									player.addProperty("color", 51356);
-									message.add("player", player);
-									jsonObject.add("message", message);
-									ctx.writeAndFlush(jsonObject);
-									return;
-								}
+								ROOM_CODES.put(privRoomId, new ConcurrentHashMap<>());
+							}
+							if (privRoomId.equals(ctx.channel().attr(PRIVATE_ROOM).get())) {
 								jsonObject = new JsonObject();
 								jsonObject.addProperty("type", "sv_receivedMessage");
 								JsonObject message = new JsonObject();
@@ -1312,7 +1354,7 @@ public class Main {
 								JsonObject textbox = new JsonObject();
 								textbox.addProperty("x", 113);
 								textbox.addProperty("y", 211);
-								textbox.addProperty("text", "Joined room: " + privRoomId);
+								textbox.addProperty("text", "Already there!");
 								textboxes.add(textbox);
 								message.add("textboxes", textboxes);
 								message.addProperty("lines", 1);
@@ -1322,51 +1364,106 @@ public class Main {
 								message.add("player", player);
 								jsonObject.add("message", message);
 								ctx.writeAndFlush(jsonObject);
-								player = ctx.channel().attr(PLAYER_DATA).get();
-								String oldPrivRoomId = ctx.channel().attr(PRIVATE_ROOM).get();
-								USERS.remove(player);
-								if (USERS.isEmpty()) {
-									ROOM_CODES.remove(oldPrivRoomId);
-								} else {
-									jsonObject = new JsonObject();
-									jsonObject.addProperty("type", "sv_playerLeft");
-									jsonObject.add("player", player);
-									jsonObject.addProperty("id", roomId);
-									sendToOthers(player, jsonObject, USERS);
-								}
-								ctx.channel().attr(PRIVATE_ROOM).set(privRoomId);
-								ROOM_CODES.get(privRoomId).put(player, ctx);
-								res = new JsonObject();
-								res.addProperty("type", "sv_playerJoined");
-								res.add("player", player);
-								res.addProperty("id", roomId);
-								sendToOthers(player, res, ROOM_CODES.get(privRoomId));
+								return;
+							}
+							if (ROOM_CODES.get(privRoomId).size() >= 16) {
+								jsonObject = new JsonObject();
+								jsonObject.addProperty("type", "sv_receivedMessage");
+								JsonObject message = new JsonObject();
+								JsonArray drawings = new JsonArray();
+								JsonObject drawing = new JsonObject();
+								drawing.addProperty("x", 0);
+								drawing.addProperty("y", 0);
+								drawing.addProperty("type", 3);
+								drawings.add(drawing);
+								message.add("drawing", drawings);
+								textboxes = new JsonArray();
+								JsonObject textbox = new JsonObject();
+								textbox.addProperty("x", 113);
+								textbox.addProperty("y", 211);
+								textbox.addProperty("text", "Room is full!");
+								textboxes.add(textbox);
+								message.add("textboxes", textboxes);
+								message.addProperty("lines", 1);
+								player = new JsonObject();
+								player.addProperty("name", "[SERVER]");
+								player.addProperty("color", 51356);
+								message.add("player", player);
+								jsonObject.add("message", message);
+								ctx.writeAndFlush(jsonObject);
+								return;
+							}
+							finalPlayer = ctx.channel().attr(PLAYER_DATA).get();
+							if (ROOM_CODES.get(privRoomId).keySet().stream().anyMatch(jsonObject1 -> jsonObject1.get("name").getAsString().equals(finalPlayer.get("name").getAsString()))) {
+								jsonObject = new JsonObject();
+								jsonObject.addProperty("type", "sv_receivedMessage");
+								JsonObject message = new JsonObject();
+								JsonArray drawings = new JsonArray();
+								JsonObject drawing = new JsonObject();
+								drawing.addProperty("x", 0);
+								drawing.addProperty("y", 0);
+								drawing.addProperty("type", 3);
+								drawings.add(drawing);
+								message.add("drawing", drawings);
+								textboxes = new JsonArray();
+								JsonObject textbox = new JsonObject();
+								textbox.addProperty("x", 113);
+								textbox.addProperty("y", 211);
+								textbox.addProperty("text", "Duplicate name!");
+								textboxes.add(textbox);
+								message.add("textboxes", textboxes);
+								message.addProperty("lines", 1);
+								player = new JsonObject();
+								player.addProperty("name", "[SERVER]");
+								player.addProperty("color", 51356);
+								message.add("player", player);
+								jsonObject.add("message", message);
+								ctx.writeAndFlush(jsonObject);
+								return;
+							}
+							jsonObject = new JsonObject();
+							jsonObject.addProperty("type", "sv_receivedMessage");
+							JsonObject message = new JsonObject();
+							JsonArray drawings = new JsonArray();
+							JsonObject drawing = new JsonObject();
+							drawing.addProperty("x", 0);
+							drawing.addProperty("y", 0);
+							drawing.addProperty("type", 3);
+							drawings.add(drawing);
+							message.add("drawing", drawings);
+							textboxes = new JsonArray();
+							JsonObject textbox = new JsonObject();
+							textbox.addProperty("x", 113);
+							textbox.addProperty("y", 211);
+							textbox.addProperty("text", "Joined room: " + privRoomId);
+							textboxes.add(textbox);
+							message.add("textboxes", textboxes);
+							message.addProperty("lines", 1);
+							player = new JsonObject();
+							player.addProperty("name", "[SERVER]");
+							player.addProperty("color", 51356);
+							message.add("player", player);
+							jsonObject.add("message", message);
+							ctx.writeAndFlush(jsonObject);
+							player = ctx.channel().attr(PLAYER_DATA).get();
+							String oldPrivRoomId = ctx.channel().attr(PRIVATE_ROOM).get();
+							USERS.remove(player);
+							if (USERS.isEmpty()) {
+								ROOM_CODES.remove(oldPrivRoomId);
 							} else {
 								jsonObject = new JsonObject();
-								jsonObject.addProperty("type", "sv_receivedMessage");
-								JsonObject message = new JsonObject();
-								JsonArray drawings = new JsonArray();
-								JsonObject drawing = new JsonObject();
-								drawing.addProperty("x", 0);
-								drawing.addProperty("y", 0);
-								drawing.addProperty("type", 3);
-								drawings.add(drawing);
-								message.add("drawing", drawings);
-								textboxes = new JsonArray();
-								JsonObject textbox = new JsonObject();
-								textbox.addProperty("x", 113);
-								textbox.addProperty("y", 211);
-								textbox.addProperty("text", "Room not found!");
-								textboxes.add(textbox);
-								message.add("textboxes", textboxes);
-								message.addProperty("lines", 1);
-								player = new JsonObject();
-								player.addProperty("name", "[SERVER]");
-								player.addProperty("color", 51356);
-								message.add("player", player);
-								jsonObject.add("message", message);
-								ctx.writeAndFlush(jsonObject);
+								jsonObject.addProperty("type", "sv_playerLeft");
+								jsonObject.add("player", player);
+								jsonObject.addProperty("id", roomId);
+								sendToOthers(player, jsonObject, USERS);
 							}
+							ctx.channel().attr(PRIVATE_ROOM).set(privRoomId);
+							ROOM_CODES.get(privRoomId).put(player, ctx);
+							res = new JsonObject();
+							res.addProperty("type", "sv_playerJoined");
+							res.add("player", player);
+							res.addProperty("id", roomId);
+							sendToOthers(player, res, ROOM_CODES.get(privRoomId));
 							return;
 						}
 					}
@@ -1461,6 +1558,7 @@ public class Main {
 						return;
 					}
 					player = ctx.channel().attr(PLAYER_DATA).get();
+					boolean filter = false;
 					boolean tcCmd = textRaw.toLowerCase().startsWith("!tripcode ") || textRaw.toLowerCase().startsWith("!tc ") || textRaw.toLowerCase().startsWith("!tripcode\n") || textRaw.toLowerCase().startsWith("!tc\n");
 					if (tcCmd) {
 						int fard = textRaw.indexOf(" ");
@@ -1515,6 +1613,69 @@ public class Main {
 						drawing.addProperty("type", 3);
 						drawings.add(drawing);
 						jsonObject.getAsJsonObject("message").add("drawing", drawings);
+					} else if (chatFilterKey != null) {
+						filter = Arrays.asList(chatFilterRooms).contains(roomId);
+					}
+					String evilText = textRaw;
+					BufferedImage drawingImage = drawImage(ctx, jsonObject, player, textboxesOut);
+					if (drawingImage != null && tess != null) {
+						try {
+							evilText = tess.doOCR(drawingImage);
+						} catch (Throwable e) {
+							e.printStackTrace();
+						}
+					}
+					if (filter) {
+						for (int ii = 0; ii < 2; ii++) {
+							try (AsyncHttpClient asyncHttpClient = Dsl.asyncHttpClient()) {
+								JsonObject jo = new JsonObject();
+								JsonObject tmpj = new JsonObject();
+								tmpj.addProperty("text", ii == 0 ? evilText : textRaw);
+								jo.add("comment", tmpj);
+								tmpj = new JsonObject();
+								for (String chatFilterAttr : chatFilterAttrs) {
+									tmpj.add(chatFilterAttr, new JsonObject());
+								}
+								jo.add("requestedAttributes", tmpj);
+								JsonArray tmpja = new JsonArray();
+								for (String chatFilterLang : chatFilterLangs) {
+									tmpja.add(chatFilterLang);
+								}
+								jo.add("languages", tmpja);
+								jo.addProperty("doNotStore", true);
+								jo.addProperty("communityId", "pictojava");
+								InputStream is = asyncHttpClient.preparePost("https://commentanalyzer.googleapis.com/v1alpha1/comments:analyze").addQueryParam("key", chatFilterKey).setHeader("Content-Type", "application/json").setBody(gson.toJson(jo)).execute().toCompletableFuture().join().getResponseBodyAsStream();
+								JsonObject resp = gson.fromJson(new InputStreamReader(is), JsonObject.class);
+								is.close();
+								if (!resp.has("attributeScores")) {
+									return;
+								}
+								JsonElement tmpje;
+								if (!(tmpje = resp.get("attributeScores")).isJsonObject()) {
+									return;
+								}
+								tmpj = tmpje.getAsJsonObject();
+								JsonObject tmpjo;
+								JsonPrimitive tmpjp;
+								for (JsonElement value : tmpj.asMap().values()) {
+									if (!value.isJsonObject()) continue;
+									tmpjo = value.getAsJsonObject();
+									if (!tmpjo.has("summaryScore")) continue;
+									value = tmpjo.get("summaryScore");
+									if (!value.isJsonObject()) continue;
+									tmpjo = value.getAsJsonObject();
+									if (!tmpjo.has("value")) continue;
+									value = tmpjo.get("value");
+									if (!value.isJsonPrimitive()) continue;
+									tmpjp = value.getAsJsonPrimitive();
+									if (!tmpjp.isNumber()) continue;
+									if (tmpjp.getAsNumber().floatValue() >= chatFilterThresh) return;
+								}
+							} catch (IOException e) {
+								System.out.println(e.getMessage());
+								return;
+							}
+						}
 					}
 					jsonObject.remove("type");
 					jsonObject.addProperty("type", "sv_receivedMessage");
@@ -1528,172 +1689,12 @@ public class Main {
 						if (textChannel != null) {
 							if (!textRaw.isEmpty())
 								textChannel.sendMessage(filterMsg(player.get("name").getAsString() + " » " + textRaw)).queue();
-							if (jsonObject.getAsJsonObject("message").has("drawing")) {
-								long startTime = System.currentTimeMillis();
-								JsonArray drawing = jsonObject.getAsJsonObject("message").getAsJsonArray("drawing");
-								if (System.currentTimeMillis() - startTime > 5000) {
-									ctx.close();
-									return;
-								}
-								int lines = jsonObject.getAsJsonObject("message").get("lines").getAsInt();
-								BufferedImage box_bg;
-								BufferedImage box_lines;
-								BufferedImage box_outline;
-								switch (lines) {
-									case 1:
-										box_bg = box_bg1;
-										box_lines = box_lines1;
-										box_outline = box_outline1;
-										break;
-									case 2:
-										box_bg = box_bg2;
-										box_lines = box_lines2;
-										box_outline = box_outline2;
-										break;
-									case 3:
-										box_bg = box_bg3;
-										box_lines = box_lines3;
-										box_outline = box_outline3;
-										break;
-									case 4:
-										box_bg = box_bg4;
-										box_lines = box_lines4;
-										box_outline = box_outline4;
-										break;
-									case 5:
-										box_bg = box_bg5;
-										box_lines = box_lines5;
-										box_outline = box_outline5;
-										break;
-									default:
-										return;
-								}
-								BufferedImage drawingImage = biDeepCopy(box_bg);
-								Graphics2D g2d = drawingImage.createGraphics();
-								g2d.setBackground(fgColor);
-								Color col = new Color(player.get("color").getAsInt());
-								box_lines = biDeepCopy(box_lines);
-								tint(box_lines, col, 0.75);
-								g2d.drawImage(box_lines, 0, 0, null);
-								box_outline = biDeepCopy(box_outline);
-								tint(box_outline, col, 1);
-								g2d.drawImage(box_outline, 0, 0, null);
-								g2d.setColor(col);
-								g2d.setStroke(stroke1);
-								if (font == null) {
-									g2d.setFont(g2d.getFont().deriveFont(12F));
-								} else {
-									g2d.setFont(font);
-								}
-								g2d.drawString(player.get("name").getAsString(), 6, 16);
-								g2d.setColor(fgColor);
-								GeneralPath polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
-								polyline.moveTo(0, 0);
-								boolean rainbow = false;
-								int rainbowDeg = 348;
-								for (JsonElement jsonElement : drawing) {
-									if (!jsonElement.isJsonObject()) continue;
-									JsonObject drawingObj = jsonElement.getAsJsonObject();
-									if (!drawingObj.has("type")) continue;
-									if (!drawingObj.has("x")) continue;
-									if (!drawingObj.has("y")) continue;
-									int type = Math.max(-1, Math.min(7, drawingObj.get("type").getAsInt()));
-									double x = Math.max(0.0, Math.min(232.0, drawingObj.get("x").getAsDouble() - 22.0));
-									double y = Math.max(0.0, Math.min(83.0, drawingObj.get("y").getAsDouble() - 208.0));
-									if (x <= 88.0 && y <= 18.0) {
-										x = 88.0;
-										y = 18.0;
-									}
-									Point2D point;
-									switch (type) {
-										case -1:
-											break;
-										case 0:
-											if (rainbow) {
-												point = polyline.getCurrentPoint();
-												if (point != null) {
-													g2d.draw(polyline);
-													polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
-													polyline.moveTo(point.getX(), point.getY());
-												}
-												rainbowDeg = (rainbowDeg + 12) % 360;
-												g2d.setColor(Color.getHSBColor(rainbowDeg / 360F, 1F, 1F));
-											}
-											polyline.lineTo(x, y);
-											break;
-										case 1:
-										case 2:
-											polyline.moveTo(x, y);
-											break;
-										case 3:
-											point = polyline.getCurrentPoint();
-											if (point != null) {
-												g2d.draw(polyline);
-												polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
-												polyline.moveTo(point.getX(), point.getY());
-											}
-											g2d.setStroke(stroke2);
-											break;
-										case 4:
-											point = polyline.getCurrentPoint();
-											if (point != null) {
-												g2d.draw(polyline);
-												polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
-												polyline.moveTo(point.getX(), point.getY());
-											}
-											g2d.setStroke(stroke1);
-											break;
-										case 5:
-											point = polyline.getCurrentPoint();
-											if (point != null) {
-												g2d.draw(polyline);
-												polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
-												polyline.moveTo(point.getX(), point.getY());
-											}
-											g2d.setColor(fgColor);
-											rainbow = false;
-											break;
-										case 6:
-											point = polyline.getCurrentPoint();
-											if (point != null) {
-												g2d.draw(polyline);
-												polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
-												polyline.moveTo(point.getX(), point.getY());
-											}
-											g2d.setColor(bgColor);
-											rainbow = false;
-											break;
-										case 7:
-											rainbow = true;
-											break;
-									}
-									if (System.currentTimeMillis() - startTime > 5000) {
-										ctx.close();
-										return;
-									}
-								}
-								g2d.draw(polyline);
-								g2d.setStroke(stroke1);
-								g2d.setColor(fgColor);
-								if (System.currentTimeMillis() - startTime > 5000) {
-									ctx.close();
-									return;
-								}
-								for (JsonElement jsonElement : textboxesOut) {
-									if (!jsonElement.isJsonObject()) continue;
-									JsonObject textboxObj = jsonElement.getAsJsonObject();
-									if (!textboxObj.has("text")) continue;
-									if (!textboxObj.has("x")) continue;
-									if (!textboxObj.has("y")) continue;
-									String text = textboxObj.get("text").getAsString();
-									double x = textboxObj.get("x").getAsDouble() - 22;
-									double y = textboxObj.get("y").getAsDouble() - 208;
-									g2d.drawString(text, (float) x, (float) y + 12);
-									if (System.currentTimeMillis() - startTime > 5000) {
-										ctx.close();
-										return;
-									}
-								}
+							if (!filter) {
+								drawingImage = drawImage(ctx, jsonObject, player, textboxesOut);
+							}
+							if (drawingImage == null) {
+								return;
+							} else {
 								ByteArrayOutputStream baos = new ByteArrayOutputStream();
 								try {
 									ImageIO.write(drawingImage, "PNG", baos);
@@ -1712,7 +1713,7 @@ public class Main {
 					roomId = ctx.channel().attr(ROOM_ID).getAndSet(null);
 					if (roomId == null) return;
 					if (roomId.equals("room_e")) {
-						String privRoomId = ctx.channel().attr(PRIVATE_ROOM).get();
+						String privRoomId = ctx.channel().attr(PRIVATE_ROOM).getAndSet(null);
 						Map<JsonObject, ChannelHandlerContext> u = ROOM_CODES.get(privRoomId);
 						u.remove(ctx.channel().attr(PLAYER_DATA).get());
 						if (u.isEmpty()) {
@@ -1749,6 +1750,178 @@ public class Main {
 			}
 		}
 
+		private BufferedImage drawImage(ChannelHandlerContext ctx, JsonObject jsonObject, JsonObject player, JsonArray textboxesOut) {
+			if (jsonObject.getAsJsonObject("message").has("drawing")) {
+				long startTime = System.currentTimeMillis();
+				JsonArray drawing = jsonObject.getAsJsonObject("message").getAsJsonArray("drawing");
+				if (System.currentTimeMillis() - startTime > 5000) {
+					ctx.close();
+					return null;
+				}
+				int lines = jsonObject.getAsJsonObject("message").get("lines").getAsInt();
+				BufferedImage box_bg;
+				BufferedImage box_lines;
+				BufferedImage box_outline;
+				switch (lines) {
+					case 1:
+						box_bg = box_bg1;
+						box_lines = box_lines1;
+						box_outline = box_outline1;
+						break;
+					case 2:
+						box_bg = box_bg2;
+						box_lines = box_lines2;
+						box_outline = box_outline2;
+						break;
+					case 3:
+						box_bg = box_bg3;
+						box_lines = box_lines3;
+						box_outline = box_outline3;
+						break;
+					case 4:
+						box_bg = box_bg4;
+						box_lines = box_lines4;
+						box_outline = box_outline4;
+						break;
+					case 5:
+						box_bg = box_bg5;
+						box_lines = box_lines5;
+						box_outline = box_outline5;
+						break;
+					default:
+						return null;
+				}
+				BufferedImage drawingImage = biDeepCopy(box_bg);
+				Graphics2D g2d = drawingImage.createGraphics();
+				g2d.setBackground(fgColor);
+				Color col = new Color(player.get("color").getAsInt());
+				box_lines = biDeepCopy(box_lines);
+				tint(box_lines, col, 0.75);
+				g2d.drawImage(box_lines, 0, 0, null);
+				box_outline = biDeepCopy(box_outline);
+				tint(box_outline, col, 1);
+				g2d.drawImage(box_outline, 0, 0, null);
+				g2d.setColor(col);
+				g2d.setStroke(stroke1);
+				if (font == null) {
+					g2d.setFont(g2d.getFont().deriveFont(12F));
+				} else {
+					g2d.setFont(font);
+				}
+				g2d.drawString(player.get("name").getAsString(), 6, 16);
+				g2d.setColor(fgColor);
+				GeneralPath polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
+				polyline.moveTo(0, 0);
+				boolean rainbow = false;
+				int rainbowDeg = 348;
+				for (JsonElement jsonElement : drawing) {
+					if (!jsonElement.isJsonObject()) continue;
+					JsonObject drawingObj = jsonElement.getAsJsonObject();
+					if (!drawingObj.has("type")) continue;
+					if (!drawingObj.has("x")) continue;
+					if (!drawingObj.has("y")) continue;
+					int type = Math.max(-1, Math.min(7, drawingObj.get("type").getAsInt()));
+					double x = Math.max(0.0, Math.min(232.0, drawingObj.get("x").getAsDouble() - 22.0));
+					double y = Math.max(0.0, Math.min(83.0, drawingObj.get("y").getAsDouble() - 208.0));
+					if (x <= 88.0 && y <= 18.0) {
+						x = 88.0;
+						y = 18.0;
+					}
+					Point2D point;
+					switch (type) {
+						case -1:
+							break;
+						case 0:
+							if (rainbow) {
+								point = polyline.getCurrentPoint();
+								if (point != null) {
+									g2d.draw(polyline);
+									polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
+									polyline.moveTo(point.getX(), point.getY());
+								}
+								rainbowDeg = (rainbowDeg + 12) % 360;
+								g2d.setColor(Color.getHSBColor(rainbowDeg / 360F, 1F, 1F));
+							}
+							polyline.lineTo(x, y);
+							break;
+						case 1:
+						case 2:
+							polyline.moveTo(x, y);
+							break;
+						case 3:
+							point = polyline.getCurrentPoint();
+							if (point != null) {
+								g2d.draw(polyline);
+								polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
+								polyline.moveTo(point.getX(), point.getY());
+							}
+							g2d.setStroke(stroke2);
+							break;
+						case 4:
+							point = polyline.getCurrentPoint();
+							if (point != null) {
+								g2d.draw(polyline);
+								polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
+								polyline.moveTo(point.getX(), point.getY());
+							}
+							g2d.setStroke(stroke1);
+							break;
+						case 5:
+							point = polyline.getCurrentPoint();
+							if (point != null) {
+								g2d.draw(polyline);
+								polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
+								polyline.moveTo(point.getX(), point.getY());
+							}
+							g2d.setColor(fgColor);
+							rainbow = false;
+							break;
+						case 6:
+							point = polyline.getCurrentPoint();
+							if (point != null) {
+								g2d.draw(polyline);
+								polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
+								polyline.moveTo(point.getX(), point.getY());
+							}
+							g2d.setColor(bgColor);
+							rainbow = false;
+							break;
+						case 7:
+							rainbow = true;
+							break;
+					}
+					if (System.currentTimeMillis() - startTime > 5000) {
+						ctx.close();
+						return null;
+					}
+				}
+				g2d.draw(polyline);
+				g2d.setStroke(stroke1);
+				g2d.setColor(fgColor);
+				if (System.currentTimeMillis() - startTime > 5000) {
+					ctx.close();
+					return null;
+				}
+				for (JsonElement jsonElement : textboxesOut) {
+					if (!jsonElement.isJsonObject()) continue;
+					JsonObject textboxObj = jsonElement.getAsJsonObject();
+					if (!textboxObj.has("text")) continue;
+					if (!textboxObj.has("x")) continue;
+					if (!textboxObj.has("y")) continue;
+					String text = textboxObj.get("text").getAsString();
+					double x = textboxObj.get("x").getAsDouble() - 22;
+					double y = textboxObj.get("y").getAsDouble() - 208;
+					g2d.drawString(text, (float) x, (float) y + 12);
+					if (System.currentTimeMillis() - startTime > 5000) {
+						ctx.close();
+						return null;
+					}
+				}
+				return drawingImage;
+			}
+			return null;
+		}
+
 		@Override
 		public void channelActive(ChannelHandlerContext ctx) throws Exception {
 			InetAddress ip = ((InetSocketAddress) ctx.channel().remoteAddress()).getAddress();
@@ -1768,7 +1941,7 @@ public class Main {
 				String roomId = ctx.channel().attr(ROOM_ID).get();
 				if (roomId == null) return;
 				if (roomId.equals("room_e")) {
-					String privRoomId = ctx.channel().attr(PRIVATE_ROOM).get();
+					String privRoomId = ctx.channel().attr(PRIVATE_ROOM).getAndSet(null);
 					Map<JsonObject, ChannelHandlerContext> u = ROOM_CODES.get(privRoomId);
 					u.remove(ctx.channel().attr(PLAYER_DATA).get());
 					if (u.isEmpty()) {

@@ -14,5 +14,21 @@
 			""
 		],
 		"status_channel": ""
-	}
+	},
+	"chat_filter": {
+		"enabled": false,
+		"key": "",
+		"rooms": [
+			"room_a",
+			"room_b"
+		],
+		"languages": [
+			"en"
+		],
+		"attributes": [
+			"PROFANITY"
+		],
+		"threshold": 0.65
+	},
+	"ocr": false
 }

@@ -15,6 +15,7 @@ dependencies {
     implementation 'net.dv8tion:JDA:5.0.0-beta.20'
     implementation 'org.slf4j:slf4j-simple:2.0.12'
     implementation 'org.asynchttpclient:async-http-client:2.12.3'
+    implementation 'net.sourceforge.tess4j:tess4j:5.11.0'
 }
 
 jar {
