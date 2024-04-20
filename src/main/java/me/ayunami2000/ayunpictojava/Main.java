@@ -26,7 +26,6 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.api.utils.FileUpload;
 import net.sourceforge.tess4j.Tesseract;
-import net.sourceforge.tess4j.TesseractException;
 import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.Dsl;
 import org.jetbrains.annotations.NotNull;
@@ -1124,6 +1123,22 @@ public class Main {
 					if (!ctx.channel().hasAttr(JOIN_COOLDOWN)) ctx.channel().attr(JOIN_COOLDOWN).set(0L);
 					if (ctx.channel().attr(JOIN_COOLDOWN).get() + 5000L > System.currentTimeMillis()) return;
 					roomId = jsonObject.get("id").getAsString();
+					res = new JsonObject();
+					res.addProperty("type", "sv_roomIds");
+					tmp = new JsonArray();
+					tmp.add(USERS_A.size());
+					tmp.add(USERS_B.size());
+					tmp.add(USERS_C.size());
+					tmp.add(USERS_D.size());
+					res.add("count", tmp);
+					tmp = new JsonArray();
+					tmp.add("room_a");
+					tmp.add("room_b");
+					tmp.add("room_c");
+					tmp.add("room_d");
+					tmp.add("room_e");
+					res.add("ids", tmp);
+					ctx.writeAndFlush(res);
 					if (!roomId.equals("room_a") && !roomId.equals("room_b") && !roomId.equals("room_c") && !roomId.equals("room_d")) {
 						res = new JsonObject();
 						res.addProperty("type", "sv_roomData");
@@ -1153,7 +1168,30 @@ public class Main {
 							privRoomId = roomId;
 							roomId = "room_e";
 							if (privRoomId.length() != 6 || !privRoomId.replaceAll("[^A-Za-z0-9]", "").equalsIgnoreCase(privRoomId)) {
-								// todo: tell user their code is invalid
+								jsonObject = new JsonObject();
+								jsonObject.addProperty("type", "sv_receivedMessage");
+								message = new JsonObject();
+								drawings = new JsonArray();
+								drawing = new JsonObject();
+								drawing.addProperty("x", 0);
+								drawing.addProperty("y", 0);
+								drawing.addProperty("type", 3);
+								drawings.add(drawing);
+								message.add("drawing", drawings);
+								textboxes = new JsonArray();
+								textbox = new JsonObject();
+								textbox.addProperty("x", 113);
+								textbox.addProperty("y", 211);
+								textbox.addProperty("text", "Invalid room code!");
+								textboxes.add(textbox);
+								message.add("textboxes", textboxes);
+								message.addProperty("lines", 1);
+								player = new JsonObject();
+								player.addProperty("name", "[SERVER]");
+								player.addProperty("color", 51356);
+								message.add("player", player);
+								jsonObject.add("message", message);
+								ctx.writeAndFlush(jsonObject);
 								ctx.close();
 								return;
 							}
@@ -1182,9 +1220,10 @@ public class Main {
 						message.add("player", player);
 						jsonObject.add("message", message);
 						ctx.writeAndFlush(jsonObject);
+						player = ctx.channel().attr(PLAYER_DATA).get();
 						res = new JsonObject();
 						res.addProperty("type", "sv_playerJoined");
-						res.add("player", ctx.channel().attr(PLAYER_DATA).get());
+						res.add("player", player);
 						res.addProperty("id", roomId);
 						sendToOthers(player, res, ROOM_CODES.get(privRoomId));
 						return;
@@ -1333,7 +1372,30 @@ public class Main {
 							String privRoomId = textRaw.replace("\n", "").substring(6, Math.min(12, textRaw.length())).toUpperCase();
 							if (!ROOM_CODES.containsKey(privRoomId)) {
 								if (privRoomId.length() != 6 || !privRoomId.replaceAll("[^A-Za-z0-9]", "").equalsIgnoreCase(privRoomId)) {
-									// todo: blablabla
+									jsonObject = new JsonObject();
+									jsonObject.addProperty("type", "sv_receivedMessage");
+									JsonObject message = new JsonObject();
+									JsonArray drawings = new JsonArray();
+									JsonObject drawing = new JsonObject();
+									drawing.addProperty("x", 0);
+									drawing.addProperty("y", 0);
+									drawing.addProperty("type", 3);
+									drawings.add(drawing);
+									message.add("drawing", drawings);
+									textboxes = new JsonArray();
+									JsonObject textbox = new JsonObject();
+									textbox.addProperty("x", 113);
+									textbox.addProperty("y", 211);
+									textbox.addProperty("text", "Room is full!");
+									textboxes.add(textbox);
+									message.add("textboxes", textboxes);
+									message.addProperty("lines", 1);
+									player = new JsonObject();
+									player.addProperty("name", "[SERVER]");
+									player.addProperty("color", 51356);
+									message.add("player", player);
+									jsonObject.add("message", message);
+									ctx.writeAndFlush(jsonObject);
 									ctx.close();
 									return;
 								}
@@ -1740,6 +1802,22 @@ public class Main {
 						jsonObject1.addProperty("id", roomId);
 						sendToOthers(player, jsonObject1, USERS);
 					}
+					res = new JsonObject();
+					res.addProperty("type", "sv_roomIds");
+					tmp = new JsonArray();
+					tmp.add(USERS_A.size());
+					tmp.add(USERS_B.size());
+					tmp.add(USERS_C.size());
+					tmp.add(USERS_D.size());
+					res.add("count", tmp);
+					tmp = new JsonArray();
+					tmp.add("room_a");
+					tmp.add("room_b");
+					tmp.add("room_c");
+					tmp.add("room_d");
+					tmp.add("room_e");
+					res.add("ids", tmp);
+					ctx.writeAndFlush(res);
 					channel = getDiscordChannelForRoomId(roomId);
 					if (channel != null) {
 						TextChannel textChannel = jda.getTextChannelById(channel);

@@ -287,6 +287,14 @@ loaderFunc = (loader, resources) => {
     let roomDir = -1;
 
     function generateRoomButtons(obj) {
+        if (pc_sprites.roomButtons) {
+            for (let i = 0; i < pc_sprites.roomButtons.length; i++) {
+                if (obj.count.length > i) {
+                    pc_sprites.roomButtons[i].pcText.text = obj.count[i] + "/16";
+                }
+            }
+            return;
+        }
         pc_sprites.roomButtons = [];
         let urlArray = ["images/room_a.png", "images/room_b.png", "images/room_c.png", "images/room_d.png", "images/room_e.png"];
         for (let i = 0; i < obj.ids.length; i++) {
@@ -1339,12 +1347,7 @@ loaderFunc = (loader, resources) => {
                 for (let i = 0; i < app.stage.children.length; i++) {
                     let child = app.stage.children[i];
                     if (child.spriteType === "kb") {
-                        // removeChild doesn't work and idk why so just move the
-                        // keys 100,000 units right and disable interaction lol
-                        //app.stage.removeChild(child);
-                        child.x += 100000;
-                        child.interactive = false;
-                        child.buttonMode = false;
+                        app.stage.removeChild(child);
                     }
                 }
                 let fadeBSInterval = setInterval(function () {
