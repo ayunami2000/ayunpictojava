@@ -237,7 +237,11 @@
                 Settings
             </div>
             <label for="int-scaling"><input type="checkbox" id="int-scaling" onchange="intScaling(true)"/>
-                Integer Scaling</label>
+                Integer Scaling</label><br/>
+            <label for="volume"><input type="range" id="volume" min="0" max="100" onchange="volume(this.value)"/>
+                Volume</label><br/>
+            <label for="pressure"><input type="checkbox" id="pressure" onchange="pressure(this.checked)"/>
+                Pressure Support</label>
             <div id="settings-done"><img src="images/done.png" onclick="closeOtherSettings()"/></div>
         </div>
     </div>
@@ -298,6 +302,12 @@
 
     document.getElementById("int-scaling").checked = (localStorage.getItem("intScaling") === "true");
     intScaling(false);
+
+    document.getElementById("volume").value = localStorage.getItem("volume") == null ? 100 : +localStorage.getItem("volume");
+    volume(document.getElementById("volume").value);
+
+    document.getElementById("pressure").checked = localStorage.getItem("pressure") == null ? false : (localStorage.getItem("pressure") === "true");
+    pressure(document.getElementById("pressure").checked);
 
     document.getElementById("name_box").value = localStorage.getItem("username");
 
@@ -391,6 +401,16 @@
             SCALE = Math.floor(SCALE);
             scaleStage();
         }
+    }
+
+    function volume(vol) {
+        localStorage.setItem("volume", vol + "");
+        Howler.volume(vol / 100);
+    }
+
+    function pressure(p) {
+        localStorage.setItem("pressure", p);
+        PRESSURE = p;
     }
 </script>
 

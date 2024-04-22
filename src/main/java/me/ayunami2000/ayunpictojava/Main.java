@@ -845,8 +845,11 @@ public class Main {
 		jda.shutdown();
 	}
 
+	protected static final AttributeKey<Integer> PINGS_ROW = AttributeKey.newInstance("pings-row");
+
 	static class WebSocketFrameToJsonObjectDecoder extends MessageToMessageDecoder<TextWebSocketFrame> {
 		private static final AttributeKey<ScheduledFuture<?>> PING_SCHEDULE = AttributeKey.valueOf("ping-schedule");
+		private static final AttributeKey<Boolean> PINGED = AttributeKey.valueOf("pinged");
 		private boolean handshakeReceived = false;
 
 		@Override
@@ -855,14 +858,28 @@ public class Main {
 				ctx.close();
 				return;
 			}
-			if (!handshakeReceived && frame.text().equals("handshake")) {
-            handshakeReceived = true;
-			if (ctx.channel().hasAttr(PING_SCHEDULE)) {
-					ctx.channel().attr(PING_SCHEDULE).get().cancel(false);
+			if (frame.text().equals("pong")) {
+				if (ctx.channel().hasAttr(PINGED) && ctx.channel().attr(PINGED).get()) {
+					ctx.close();
+				} else {
+					int pr = ctx.channel().hasAttr(PINGS_ROW) ? ctx.channel().attr(PINGS_ROW).get() : 0;
+					if (pr >= 10) {
+						// idle
+						ctx.close();
+						return;
+					}
+					ctx.channel().attr(PINGS_ROW).set(pr + 1);
+					ctx.channel().attr(PINGED).set(true);
 				}
+				return;
+			}
+			if (!handshakeReceived && frame.text().equals("handshake")) {
+				handshakeReceived = true;
+				ctx.channel().attr(PINGED).set(true);
 				// Reschedule ping task
 				ctx.channel().attr(PING_SCHEDULE).set(ctx.executor().scheduleAtFixedRate(() -> {
-					if (ctx.channel().isActive()) {
+					if (ctx.channel().isActive() && ctx.channel().hasAttr(PINGED) && ctx.channel().attr(PINGED).get()) {
+						ctx.channel().attr(PINGED).set(false);
 						ctx.writeAndFlush(new TextWebSocketFrame("ping"));
 					} else {
 						ctx.close();
@@ -925,7 +942,6 @@ public class Main {
 		public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
 			ctx.close();
 		}
-		//*/
 
 		private static final AttributeKey<JsonObject> PLAYER_DATA = AttributeKey.newInstance("player-data");
 
@@ -1035,6 +1051,7 @@ public class Main {
 
 		@Override
 		protected void channelRead0(ChannelHandlerContext ctx, JsonObject jsonObject) {
+			ctx.channel().attr(PINGS_ROW).set(0);
 			if (!jsonObject.has("type")) {
 				ctx.close();
 				return;
@@ -1145,56 +1162,19 @@ public class Main {
 						res.addProperty("id", "room_e");
 						res.addProperty("private", true);
 						ctx.writeAndFlush(res);
-						jsonObject = new JsonObject();
-						jsonObject.addProperty("type", "sv_receivedMessage");
-						JsonObject message = new JsonObject();
-						JsonArray drawings = new JsonArray();
-						JsonObject drawing = new JsonObject();
-						drawing.addProperty("x", 0);
-						drawing.addProperty("y", 0);
-						drawing.addProperty("type", 3);
-						drawings.add(drawing);
-						message.add("drawing", drawings);
-						JsonArray textboxes = new JsonArray();
-						JsonObject textbox = new JsonObject();
-						textbox.addProperty("x", 113);
-						textbox.addProperty("y", 211);
-						String privRoomId;
-						if (roomId.equals("room_e")) {
-							do {
-								privRoomId = genRoomCode();
-							} while (ROOM_CODES.containsKey(privRoomId));
-						} else {
+						String privRoomId = null;
+						if (!roomId.equals("room_e")) {
 							privRoomId = roomId;
 							roomId = "room_e";
 							if (privRoomId.length() != 6 || !privRoomId.replaceAll("[^A-Za-z0-9]", "").equalsIgnoreCase(privRoomId)) {
-								jsonObject = new JsonObject();
-								jsonObject.addProperty("type", "sv_receivedMessage");
-								message = new JsonObject();
-								drawings = new JsonArray();
-								drawing = new JsonObject();
-								drawing.addProperty("x", 0);
-								drawing.addProperty("y", 0);
-								drawing.addProperty("type", 3);
-								drawings.add(drawing);
-								message.add("drawing", drawings);
-								textboxes = new JsonArray();
-								textbox = new JsonObject();
-								textbox.addProperty("x", 113);
-								textbox.addProperty("y", 211);
-								textbox.addProperty("text", "Invalid room code!");
-								textboxes.add(textbox);
-								message.add("textboxes", textboxes);
-								message.addProperty("lines", 1);
-								player = new JsonObject();
-								player.addProperty("name", "[SERVER]");
-								player.addProperty("color", 51356);
-								message.add("player", player);
-								jsonObject.add("message", message);
-								ctx.writeAndFlush(jsonObject);
-								ctx.close();
-								return;
+								ctx.writeAndFlush(generateServerMessage("Invalid room code!"));
+								privRoomId = null;
 							}
+						}
+						if (privRoomId == null) {
+							do {
+								privRoomId = genRoomCode();
+							} while (ROOM_CODES.containsKey(privRoomId));
 						}
 						if (ROOM_CODES.containsKey(privRoomId)) {
 							ROOM_CODES.get(privRoomId).put(ctx.channel().attr(PLAYER_DATA).get(), ctx);
@@ -1205,21 +1185,7 @@ public class Main {
 						}
 						ctx.channel().attr(PRIVATE_ROOM).set(privRoomId);
 						ctx.channel().attr(ROOM_ID).set(roomId);
-						textbox.addProperty("text", "Your room code is: " + privRoomId);
-						textboxes.add(textbox);
-						textbox = new JsonObject();
-						textbox.addProperty("x", 27);
-						textbox.addProperty("y", 227);
-						textbox.addProperty("text", "!join to go to another");
-						textboxes.add(textbox);
-						message.add("textboxes", textboxes);
-						message.addProperty("lines", 2);
-						player = new JsonObject();
-						player.addProperty("name", "[SERVER]");
-						player.addProperty("color", 51356);
-						message.add("player", player);
-						jsonObject.add("message", message);
-						ctx.writeAndFlush(jsonObject);
+						ctx.writeAndFlush(generateServerMessage("Your room code is: " + privRoomId, "!join to go to another"));
 						player = ctx.channel().attr(PLAYER_DATA).get();
 						res = new JsonObject();
 						res.addProperty("type", "sv_playerJoined");
@@ -1259,47 +1225,25 @@ public class Main {
 						return;
 					}
 
-					if (!ctx.channel().hasAttr(COOLDOWN)) ctx.channel().attr(COOLDOWN).set(System.currentTimeMillis() - 64000L);
-					if (!ctx.channel().hasAttr(RATELIMIT)) ctx.channel().attr(RATELIMIT).set(1000);
-					if (ctx.channel().attr(COOLDOWN).get() > System.currentTimeMillis()) {
-						jsonObject = new JsonObject();
-						jsonObject.addProperty("type", "sv_receivedMessage");
-						JsonObject message = new JsonObject();
-						JsonArray drawings = new JsonArray();
-						JsonObject drawing = new JsonObject();
-						drawing.addProperty("x", 0);
-						drawing.addProperty("y", 0);
-						drawing.addProperty("type", 3);
-						drawings.add(drawing);
-						message.add("drawing", drawings);
-						JsonArray textboxes = new JsonArray();
-						JsonObject textbox = new JsonObject();
-						textbox.addProperty("x", 113);
-						textbox.addProperty("y", 211);
-						textbox.addProperty("text", "Ratelimited: Please wait " + (1 + (int) (ctx.channel().attr(COOLDOWN).get() - System.currentTimeMillis()) / 1000) + "s");
-						textboxes.add(textbox);
-						message.add("textboxes", textboxes);
-						message.addProperty("lines", 1);
-						player = new JsonObject();
-						player.addProperty("name", "[SERVER]");
-						player.addProperty("color", 16463656);
-						message.add("player", player);
-						jsonObject.add("message", message);
-						ctx.writeAndFlush(jsonObject);
-						return;
-					} else {
-						if (System.currentTimeMillis() - ctx.channel().attr(COOLDOWN).get() < 1000) {
-							ctx.channel().attr(RATELIMIT).set(Math.min(32000, ctx.channel().attr(RATELIMIT).get() * 2));
-						} else {
-							ctx.channel().attr(RATELIMIT).set(1000);
-						}
-						ctx.channel().attr(COOLDOWN).set(System.currentTimeMillis() + ctx.channel().attr(RATELIMIT).get());
-					}
 					roomId = ctx.channel().attr(ROOM_ID).get();
 					if (roomId == null) return;
 					if (roomId.equals("room_e")) {
 						USERS = ROOM_CODES.get(ctx.channel().attr(PRIVATE_ROOM).get());
 					} else {
+						if (!ctx.channel().hasAttr(COOLDOWN))
+							ctx.channel().attr(COOLDOWN).set(System.currentTimeMillis() - 64000L);
+						if (!ctx.channel().hasAttr(RATELIMIT)) ctx.channel().attr(RATELIMIT).set(1000);
+						if (ctx.channel().attr(COOLDOWN).get() > System.currentTimeMillis()) {
+							ctx.writeAndFlush(generateServerMessage(16463656, "Ratelimited: Please wait " + (1 + (int) (ctx.channel().attr(COOLDOWN).get() - System.currentTimeMillis()) / 1000) + "s"));
+							return;
+						} else {
+							if (System.currentTimeMillis() - ctx.channel().attr(COOLDOWN).get() < 1000) {
+								ctx.channel().attr(RATELIMIT).set(Math.min(32000, ctx.channel().attr(RATELIMIT).get() * 2));
+							} else {
+								ctx.channel().attr(RATELIMIT).set(1000);
+							}
+							ctx.channel().attr(COOLDOWN).set(System.currentTimeMillis() + ctx.channel().attr(RATELIMIT).get());
+						}
 						USERS = getUsersForRoomId(roomId);
 					}
 					if (USERS == null) return;
@@ -1343,170 +1287,31 @@ public class Main {
 					String textRaw = textRawBuilder.toString().trim();
 					if (roomId.equals("room_e")) {
 						if (textRaw.equalsIgnoreCase("!join")) {
-							jsonObject = new JsonObject();
-							jsonObject.addProperty("type", "sv_receivedMessage");
-							JsonObject message = new JsonObject();
-							JsonArray drawings = new JsonArray();
-							JsonObject drawing = new JsonObject();
-							drawing.addProperty("x", 0);
-							drawing.addProperty("y", 0);
-							drawing.addProperty("type", 3);
-							drawings.add(drawing);
-							message.add("drawing", drawings);
-							textboxes = new JsonArray();
-							JsonObject textbox = new JsonObject();
-							textbox.addProperty("x", 113);
-							textbox.addProperty("y", 211);
-							textbox.addProperty("text", "Usage: !join <code>");
-							textboxes.add(textbox);
-							message.add("textboxes", textboxes);
-							message.addProperty("lines", 1);
-							player = new JsonObject();
-							player.addProperty("name", "[SERVER]");
-							player.addProperty("color", 51356);
-							message.add("player", player);
-							jsonObject.add("message", message);
-							ctx.writeAndFlush(jsonObject);
+							ctx.writeAndFlush(generateServerMessage("Usage: !join <code>"));
 							return;
 						} else if (textRaw.toLowerCase().startsWith("!join ")) {
 							String privRoomId = textRaw.replace("\n", "").substring(6, Math.min(12, textRaw.length())).toUpperCase();
 							if (!ROOM_CODES.containsKey(privRoomId)) {
 								if (privRoomId.length() != 6 || !privRoomId.replaceAll("[^A-Za-z0-9]", "").equalsIgnoreCase(privRoomId)) {
-									jsonObject = new JsonObject();
-									jsonObject.addProperty("type", "sv_receivedMessage");
-									JsonObject message = new JsonObject();
-									JsonArray drawings = new JsonArray();
-									JsonObject drawing = new JsonObject();
-									drawing.addProperty("x", 0);
-									drawing.addProperty("y", 0);
-									drawing.addProperty("type", 3);
-									drawings.add(drawing);
-									message.add("drawing", drawings);
-									textboxes = new JsonArray();
-									JsonObject textbox = new JsonObject();
-									textbox.addProperty("x", 113);
-									textbox.addProperty("y", 211);
-									textbox.addProperty("text", "Room is full!");
-									textboxes.add(textbox);
-									message.add("textboxes", textboxes);
-									message.addProperty("lines", 1);
-									player = new JsonObject();
-									player.addProperty("name", "[SERVER]");
-									player.addProperty("color", 51356);
-									message.add("player", player);
-									jsonObject.add("message", message);
-									ctx.writeAndFlush(jsonObject);
-									ctx.close();
+									ctx.writeAndFlush(generateServerMessage("Room is full!"));
 									return;
 								}
 								ROOM_CODES.put(privRoomId, new ConcurrentHashMap<>());
 							}
 							if (privRoomId.equals(ctx.channel().attr(PRIVATE_ROOM).get())) {
-								jsonObject = new JsonObject();
-								jsonObject.addProperty("type", "sv_receivedMessage");
-								JsonObject message = new JsonObject();
-								JsonArray drawings = new JsonArray();
-								JsonObject drawing = new JsonObject();
-								drawing.addProperty("x", 0);
-								drawing.addProperty("y", 0);
-								drawing.addProperty("type", 3);
-								drawings.add(drawing);
-								message.add("drawing", drawings);
-								textboxes = new JsonArray();
-								JsonObject textbox = new JsonObject();
-								textbox.addProperty("x", 113);
-								textbox.addProperty("y", 211);
-								textbox.addProperty("text", "Already there!");
-								textboxes.add(textbox);
-								message.add("textboxes", textboxes);
-								message.addProperty("lines", 1);
-								player = new JsonObject();
-								player.addProperty("name", "[SERVER]");
-								player.addProperty("color", 51356);
-								message.add("player", player);
-								jsonObject.add("message", message);
-								ctx.writeAndFlush(jsonObject);
+								ctx.writeAndFlush(generateServerMessage("Already there!"));
 								return;
 							}
 							if (ROOM_CODES.get(privRoomId).size() >= 16) {
-								jsonObject = new JsonObject();
-								jsonObject.addProperty("type", "sv_receivedMessage");
-								JsonObject message = new JsonObject();
-								JsonArray drawings = new JsonArray();
-								JsonObject drawing = new JsonObject();
-								drawing.addProperty("x", 0);
-								drawing.addProperty("y", 0);
-								drawing.addProperty("type", 3);
-								drawings.add(drawing);
-								message.add("drawing", drawings);
-								textboxes = new JsonArray();
-								JsonObject textbox = new JsonObject();
-								textbox.addProperty("x", 113);
-								textbox.addProperty("y", 211);
-								textbox.addProperty("text", "Room is full!");
-								textboxes.add(textbox);
-								message.add("textboxes", textboxes);
-								message.addProperty("lines", 1);
-								player = new JsonObject();
-								player.addProperty("name", "[SERVER]");
-								player.addProperty("color", 51356);
-								message.add("player", player);
-								jsonObject.add("message", message);
-								ctx.writeAndFlush(jsonObject);
+								ctx.writeAndFlush(generateServerMessage("Room is full!"));
 								return;
 							}
 							finalPlayer = ctx.channel().attr(PLAYER_DATA).get();
 							if (ROOM_CODES.get(privRoomId).keySet().stream().anyMatch(jsonObject1 -> jsonObject1.get("name").getAsString().equals(finalPlayer.get("name").getAsString()))) {
-								jsonObject = new JsonObject();
-								jsonObject.addProperty("type", "sv_receivedMessage");
-								JsonObject message = new JsonObject();
-								JsonArray drawings = new JsonArray();
-								JsonObject drawing = new JsonObject();
-								drawing.addProperty("x", 0);
-								drawing.addProperty("y", 0);
-								drawing.addProperty("type", 3);
-								drawings.add(drawing);
-								message.add("drawing", drawings);
-								textboxes = new JsonArray();
-								JsonObject textbox = new JsonObject();
-								textbox.addProperty("x", 113);
-								textbox.addProperty("y", 211);
-								textbox.addProperty("text", "Duplicate name!");
-								textboxes.add(textbox);
-								message.add("textboxes", textboxes);
-								message.addProperty("lines", 1);
-								player = new JsonObject();
-								player.addProperty("name", "[SERVER]");
-								player.addProperty("color", 51356);
-								message.add("player", player);
-								jsonObject.add("message", message);
-								ctx.writeAndFlush(jsonObject);
+								ctx.writeAndFlush(generateServerMessage("Duplicate name!"));
 								return;
 							}
-							jsonObject = new JsonObject();
-							jsonObject.addProperty("type", "sv_receivedMessage");
-							JsonObject message = new JsonObject();
-							JsonArray drawings = new JsonArray();
-							JsonObject drawing = new JsonObject();
-							drawing.addProperty("x", 0);
-							drawing.addProperty("y", 0);
-							drawing.addProperty("type", 3);
-							drawings.add(drawing);
-							message.add("drawing", drawings);
-							textboxes = new JsonArray();
-							JsonObject textbox = new JsonObject();
-							textbox.addProperty("x", 113);
-							textbox.addProperty("y", 211);
-							textbox.addProperty("text", "Joined room: " + privRoomId);
-							textboxes.add(textbox);
-							message.add("textboxes", textboxes);
-							message.addProperty("lines", 1);
-							player = new JsonObject();
-							player.addProperty("name", "[SERVER]");
-							player.addProperty("color", 51356);
-							message.add("player", player);
-							jsonObject.add("message", message);
-							ctx.writeAndFlush(jsonObject);
+							ctx.writeAndFlush(generateServerMessage("Joined room: " + privRoomId));
 							player = ctx.channel().attr(PLAYER_DATA).get();
 							String oldPrivRoomId = ctx.channel().attr(PRIVATE_ROOM).get();
 							USERS.remove(player);
@@ -1530,17 +1335,6 @@ public class Main {
 						}
 					}
 					if (textRaw.equalsIgnoreCase("!list") || textRaw.equalsIgnoreCase("!l")) {
-						jsonObject = new JsonObject();
-						jsonObject.addProperty("type", "sv_receivedMessage");
-						JsonObject message = new JsonObject();
-						JsonArray drawings = new JsonArray();
-						JsonObject drawing = new JsonObject();
-						drawing.addProperty("x", 0);
-						drawing.addProperty("y", 0);
-						drawing.addProperty("type", 3);
-						drawings.add(drawing);
-						message.add("drawing", drawings);
-						textboxes = new JsonArray();
 						Set<JsonObject> players = USERS.keySet();
 						StringBuilder content = new StringBuilder();
 						for (JsonObject pl : players) content.append(pl.get("name").getAsString()).append(" ; ");
@@ -1549,34 +1343,7 @@ public class Main {
 						} else {
 							content.append("(nobody is online)");
 						}
-						String[] lines;
-						if (content.length() > 25) {
-							String firstLine = content.substring(0, 25);
-							String[] lastLines = content.substring(25).split("(?<=\\G.{40})", 4);
-							lines = new String[lastLines.length + 1];
-							System.arraycopy(lastLines, 0, lines, 1, lastLines.length);
-							lines[0] = firstLine;
-							String lastLine = lines[lines.length - 1];
-							if (lastLine.length() > 37)
-								lines[lines.length - 1] = lastLine.substring(0, 37) + "...";
-						} else {
-							lines = new String[]{content.toString()};
-						}
-						for (int i = 0; i < lines.length; i++) {
-							JsonObject textbox = new JsonObject();
-							textbox.addProperty("x", i == 0 ? 113 : 27);
-							textbox.addProperty("y", 211 + i * 16);
-							textbox.addProperty("text", lines[i]);
-							textboxes.add(textbox);
-						}
-						message.add("textboxes", textboxes);
-						message.addProperty("lines", lines.length);
-						player = new JsonObject();
-						player.addProperty("name", "[SERVER]");
-						player.addProperty("color", 51356);
-						message.add("player", player);
-						jsonObject.add("message", message);
-						ctx.writeAndFlush(jsonObject);
+						ctx.writeAndFlush(generateServerMessageMultiline(content.toString()));
 						return;
 					}
 					if ((textRaw.toLowerCase().startsWith("!block ") && textRaw.length() > 7) || (textRaw.toLowerCase().startsWith("!ignore ") && textRaw.length() > 8) || (textRaw.toLowerCase().startsWith("!unblock ") && textRaw.length() > 9) || (textRaw.toLowerCase().startsWith("!unignore ") && textRaw.length() > 10)) {
@@ -1593,30 +1360,7 @@ public class Main {
 						if (!removed) {
 							ignored.add(target);
 						}
-						jsonObject = new JsonObject();
-						jsonObject.addProperty("type", "sv_receivedMessage");
-						JsonObject message = new JsonObject();
-						JsonArray drawings = new JsonArray();
-						JsonObject drawing = new JsonObject();
-						drawing.addProperty("x", 0);
-						drawing.addProperty("y", 0);
-						drawing.addProperty("type", 3);
-						drawings.add(drawing);
-						message.add("drawing", drawings);
-						textboxes = new JsonArray();
-						JsonObject textbox = new JsonObject();
-						textbox.addProperty("x", 113);
-						textbox.addProperty("y", 211);
-						textbox.addProperty("text", (removed ? "Unb" : "B") + "locked: " + target);
-						textboxes.add(textbox);
-						message.add("textboxes", textboxes);
-						message.addProperty("lines", 1);
-						player = new JsonObject();
-						player.addProperty("name", "[SERVER]");
-						player.addProperty("color", 51356);
-						message.add("player", player);
-						jsonObject.add("message", message);
-						ctx.writeAndFlush(jsonObject);
+						ctx.writeAndFlush(generateServerMessage((removed ? "Unb" : "B") + "locked: " + target));
 						return;
 					}
 					player = ctx.channel().attr(PLAYER_DATA).get();
@@ -1826,6 +1570,83 @@ public class Main {
 					}
 					break;
 			}
+		}
+
+		private static JsonObject generateServerMessageMultiline(String content) {
+			return generateServerMessage(51356, null, null, content);
+		}
+
+		private static JsonObject generateServerMessage(String line1) {
+			return generateServerMessage(line1, null);
+		}
+
+		private static JsonObject generateServerMessage(String line1, String line2) {
+			return generateServerMessage(51356, line1, line2, null);
+		}
+
+		private static JsonObject generateServerMessage(int color, String line1) {
+			return generateServerMessage(color, line1, null, null);
+		}
+
+		private static JsonObject generateServerMessage(int color, String line1, String line2, String content) {
+			JsonObject jsonObject = new JsonObject();
+			jsonObject.addProperty("type", "sv_receivedMessage");
+			JsonObject message = new JsonObject();
+			JsonArray drawings = new JsonArray();
+			JsonObject drawing = new JsonObject();
+			drawing.addProperty("x", 0);
+			drawing.addProperty("y", 0);
+			drawing.addProperty("type", 3);
+			drawings.add(drawing);
+			message.add("drawing", drawings);
+			JsonArray textboxes = new JsonArray();
+			if (line1 != null) {
+				JsonObject textbox = new JsonObject();
+				textbox.addProperty("x", 113);
+				textbox.addProperty("y", 211);
+				textbox.addProperty("text", line1);
+				textboxes.add(textbox);
+			}
+			if (line2 != null) {
+				JsonObject textbox = new JsonObject();
+				textbox.addProperty("x", 27);
+				textbox.addProperty("y", 227);
+				textbox.addProperty("text", line2);
+				textboxes.add(textbox);
+			}
+			if (textboxes.isEmpty() && content != null) {
+				String[] lines;
+				if (content.length() > 25) {
+					String firstLine = content.substring(0, 25);
+					String[] lastLines = content.substring(25).split("(?<=\\G.{40})", 4);
+					lines = new String[lastLines.length + 1];
+					System.arraycopy(lastLines, 0, lines, 1, lastLines.length);
+					lines[0] = firstLine;
+					String lastLine = lines[lines.length - 1];
+					if (lastLine.length() > 37)
+						lines[lines.length - 1] = lastLine.substring(0, 37) + "...";
+				} else {
+					lines = new String[]{content};
+				}
+				for (int i = 0; i < lines.length; i++) {
+					JsonObject textbox = new JsonObject();
+					textbox.addProperty("x", i == 0 ? 113 : 27);
+					textbox.addProperty("y", 211 + i * 16);
+					textbox.addProperty("text", lines[i]);
+					textboxes.add(textbox);
+				}
+				message.add("textboxes", textboxes);
+				message.addProperty("lines", lines.length);
+			} else {
+				message.add("textboxes", textboxes);
+				message.addProperty("lines", line2 == null ? 1 : 2);
+			}
+			JsonObject player = new JsonObject();
+			player.addProperty("name", "[SERVER]");
+			player.addProperty("color", color);
+			message.add("player", player);
+			jsonObject.add("message", message);
+			return jsonObject;
 		}
 
 		private BufferedImage drawImage(ChannelHandlerContext ctx, JsonObject jsonObject, JsonObject player, JsonArray textboxesOut) {

@@ -1,3 +1,4 @@
+let PRESSURE = false;
 let SCALE = 2.5;
 const app = new PIXI.Application({width: 256 * SCALE, height: 384 * SCALE});
 let websocket;
@@ -1347,7 +1348,12 @@ loaderFunc = (loader, resources) => {
                 for (let i = 0; i < app.stage.children.length; i++) {
                     let child = app.stage.children[i];
                     if (child.spriteType === "kb") {
-                        app.stage.removeChild(child);
+                        // removeChild doesn't work and idk why so just move the
+                        // keys 100,000 units right and disable interaction lol
+                        //app.stage.removeChild(child);
+                        child.x += 100000;
+                        child.interactive = false;
+                        child.buttonMode = false;
                     }
                 }
                 let fadeBSInterval = setInterval(function () {
@@ -1378,7 +1384,6 @@ loaderFunc = (loader, resources) => {
         function heartbeat() {
             websocket.send("pong");
 			//console.log("Pong sent");
-            clearTimeout(websocket.pingTimeout);
         }
 
         websocket.onopen = function (event) {
@@ -1536,7 +1541,6 @@ loaderFunc = (loader, resources) => {
 
         websocket.onclose = function () {
             connectionClosed();
-            clearTimeout(websocket.pingTimeout);
         }
     }
 
@@ -1737,11 +1741,27 @@ loaderFunc = (loader, resources) => {
     setupWebSocket();
     scrollMessages(pc_sprites.opening_message.height - 2);
 
+    function pressureSwitch(pressure) {
+        if (!PRESSURE) return;
+        if (!joinedRoom) return;
+        if (pressure > 0.625) {
+            if (!bigPenMode) {
+                bigPenBtn.emit("pointerup");
+            }
+        } else {
+            if (bigPenMode) {
+                smallPenBtn.emit("pointerup");
+            }
+        }
+    }
+
     app.renderer.plugins.interaction.on('pointermove', function (event) {
+        pressureSwitch(event.pressure);
         mousePos.x = event.data.global.x / SCALE;
         mousePos.y = event.data.global.y / SCALE;
     });
     app.renderer.plugins.interaction.on('pointerdown', function (event) {
+        pressureSwitch(event.pressure);
         mousePos.x = event.data.global.x / SCALE;
         mousePos.y = event.data.global.y / SCALE;
         if (inputFlag) {
@@ -1756,6 +1776,7 @@ loaderFunc = (loader, resources) => {
         }
     });
     app.renderer.plugins.interaction.on('pointerup', function (event) {
+        pressureSwitch(event.pressure);
         mousePos.x = event.data.global.x / SCALE;
         mousePos.y = event.data.global.y / SCALE;
     });
