@@ -863,7 +863,7 @@ public class Main {
 					ctx.close();
 				} else {
 					int pr = ctx.channel().hasAttr(PINGS_ROW) ? ctx.channel().attr(PINGS_ROW).get() : 0;
-					if (pr >= 10) {
+					if (pr >= 300) {
 						// idle
 						ctx.close();
 						return;

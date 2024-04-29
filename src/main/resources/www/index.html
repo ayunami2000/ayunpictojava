@@ -201,10 +201,18 @@
         #settings-done {
             cursor: pointer;
             position: relative;
-            bottom: -220px;
+            bottom: -150px;
             width: 90px;
             margin-left: auto;
             margin-right: auto;
+        }
+
+        html.dark canvas {
+            filter: invert(100%) brightness(75%) saturate(150%) invert(100%);
+        }
+
+        html.dark body, html.dark iframe[title*="hCaptcha"], html.dark #captcha {
+            filter: hue-rotate(180deg) invert(100%);
         }
     </style>
 
@@ -241,7 +249,9 @@
             <label for="volume"><input type="range" id="volume" min="0" max="100" onchange="volume(this.value)"/>
                 Volume</label><br/>
             <label for="pressure"><input type="checkbox" id="pressure" onchange="pressure(this.checked)"/>
-                Pressure Support</label>
+                Pressure Support</label><br/>
+            <label for="dark"><input type="checkbox" id="dark" onchange="dark(this.checked)"/>
+                Dark Mode</label>
             <div id="settings-done"><img src="images/done.png" onclick="closeOtherSettings()"/></div>
         </div>
     </div>
@@ -308,6 +318,11 @@
 
     document.getElementById("pressure").checked = localStorage.getItem("pressure") == null ? false : (localStorage.getItem("pressure") === "true");
     pressure(document.getElementById("pressure").checked);
+
+    document.getElementById("dark").checked = localStorage.getItem("dark") == null ? false : (localStorage.getItem("dark") === "true");
+    if (document.getElementById("dark").checked) {
+        dark(true);
+    }
 
     document.getElementById("name_box").value = localStorage.getItem("username");
 
@@ -411,6 +426,15 @@
     function pressure(p) {
         localStorage.setItem("pressure", p);
         PRESSURE = p;
+    }
+
+    function dark(d) {
+        localStorage.setItem("dark", d);
+        if (d) {
+            document.documentElement.classList.add("dark");
+        } else {
+            document.documentElement.classList.remove("dark");
+        }
     }
 </script>
 
