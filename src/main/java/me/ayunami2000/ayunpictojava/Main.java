@@ -68,6 +68,8 @@ public class Main {
 	private static String[] chatFilterAttrs = null;
 	private static String[] chatFilterRooms = null;
 	private static float chatFilterThresh = 0.65f;
+	
+	private static final Set<Channel> connections = new HashSet<>();
 
 	private static Tesseract tess = null;
 
@@ -663,39 +665,6 @@ public class Main {
 									remoteAddressField.setAccessible(true);
 									remoteAddressField.set(ctx.channel(), new InetSocketAddress(ip, 0));
 								}
-								int i = 0;
-								for (ChannelHandlerContext ctxx : USERS_A.values()) {
-									InetAddress ipp = ((InetSocketAddress) ctxx.channel().remoteAddress()).getAddress();
-									if (ipp.getHostAddress().equalsIgnoreCase(ip)) i++;
-									if (i >= 5) {
-										ctx.close();
-										return;
-									}
-								}
-								for (ChannelHandlerContext ctxx : USERS_B.values()) {
-									InetAddress ipp = ((InetSocketAddress) ctxx.channel().remoteAddress()).getAddress();
-									if (ipp.getHostAddress().equalsIgnoreCase(ip)) i++;
-									if (i >= 5) {
-										ctx.close();
-										return;
-									}
-								}
-								for (ChannelHandlerContext ctxx : USERS_C.values()) {
-									InetAddress ipp = ((InetSocketAddress) ctxx.channel().remoteAddress()).getAddress();
-									if (ipp.getHostAddress().equalsIgnoreCase(ip)) i++;
-									if (i >= 5) {
-										ctx.close();
-										return;
-									}
-								}
-								for (ChannelHandlerContext ctxx : USERS_D.values()) {
-									InetAddress ipp = ((InetSocketAddress) ctxx.channel().remoteAddress()).getAddress();
-									if (ipp.getHostAddress().equalsIgnoreCase(ip)) i++;
-									if (i >= 5) {
-										ctx.close();
-										return;
-									}
-								}
 								for (JsonElement jsonElement : banList)
 									if (jsonElement.getAsString().equals(ip)) {
 										ctx.close();
@@ -707,6 +676,21 @@ public class Main {
 									pipeline.addLast("websocket-frametojson", new WebSocketFrameToJsonObjectDecoder());
 									pipeline.addLast("websocket-jsontoframe", new JsonObjectToWebSocketFrameEncoder());
 									pipeline.addLast("server-handler", new ServerHandler());
+									Set<Channel> tmp = new HashSet<>(connections);
+									int i = 0;
+									for (Channel connection : tmp) {
+										if (!connection.isOpen()) {
+											connections.remove(connection);
+											continue;
+										}
+										InetAddress ipp = ((InetSocketAddress) connection.remoteAddress()).getAddress();
+										if (ipp.getHostAddress().equalsIgnoreCase(ip)) i++;
+										if (i >= 5) {
+											ctx.close();
+											return;
+										}
+									}
+									connections.add(ctx.channel());
 								} else {
 									pipeline.addLast(new HttpStaticFileServerHandler(web));
 								}
@@ -1104,7 +1088,9 @@ public class Main {
 					if (name.length() > 10) name = name.substring(0, 10);
 					player.addProperty("name", name);
 					int color = player.remove("color").getAsInt();
-					if (color < 0 || color > 16777215) color = 0;
+					if (color < 0 || color > 16777215) color = 14013909;
+					Color ccc = new Color(color);
+					if (ccc.getRed() + ccc.getGreen() + ccc.getBlue() >= 2.5 * 255) color = 14013909;
 					player.addProperty("color", color);
 					ctx.channel().attr(PLAYER_DATA).set(player);
 					res = new JsonObject();
