@@ -412,6 +412,10 @@
         }
     }
 
+    window.onresize = function() {
+        intScaling(false);
+    };
+
     function volume(vol) {
         localStorage.setItem("volume", vol + "");
         Howler.volume(vol / 100);
