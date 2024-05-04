@@ -207,12 +207,8 @@
             margin-right: auto;
         }
 
-        html.dark canvas {
-            filter: invert(100%) brightness(75%) saturate(150%) invert(100%);
-        }
-
-        html.dark body, html.dark iframe[title*="hCaptcha"], html.dark #captcha {
-            filter: hue-rotate(180deg) invert(100%);
+        html.dark body, html.dark iframe[title*="hCaptcha"], html.dark #captcha, html.dark .pcr-app, html.dark .pcr-button {
+            filter: invert(100%);
         }
     </style>
 
@@ -258,9 +254,8 @@
     <input type="password" id="topy" style="display: none;" maxlength="0" autocorrect="off" autocapitalize="off"
            autocomplete="off"/>
 </div>
-
-<script src="main.js"></script>
 <script>
+    let darkMode = false;
     const swatches = [
         '#61829a',
         '#ba4900',
@@ -311,7 +306,6 @@
     }
 
     document.getElementById("int-scaling").checked = (localStorage.getItem("intScaling") === "true");
-    intScaling(false);
 
     document.getElementById("volume").value = localStorage.getItem("volume") == null ? 100 : +localStorage.getItem("volume");
     volume(document.getElementById("volume").value);
@@ -321,7 +315,7 @@
 
     document.getElementById("dark").checked = localStorage.getItem("dark") == null ? false : (localStorage.getItem("dark") === "true");
     if (document.getElementById("dark").checked) {
-        dark(true);
+        dark(true, true);
     }
 
     document.getElementById("name_box").value = localStorage.getItem("username");
@@ -428,14 +422,20 @@
         PRESSURE = p;
     }
 
-    function dark(d) {
+    function dark(d, s) {
+        darkMode = d;
         localStorage.setItem("dark", d);
         if (d) {
             document.documentElement.classList.add("dark");
         } else {
             document.documentElement.classList.remove("dark");
         }
+        if (!s) window.location.reload();
     }
+</script>
+<script src="main.js"></script>
+<script>
+    intScaling(false);
 </script>
 
 </body>

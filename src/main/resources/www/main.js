@@ -1,3 +1,15 @@
+const flipHueFilter = new PIXI.filters.ColorMatrixFilter();
+flipHueFilter.hue(180);
+
+if (darkMode) {
+    const tmtptmtp = PIXI.Sprite.from;
+    PIXI.Sprite.from = function (...a) {
+        const xd = tmtptmtp(...a);
+        xd.filters = [ flipHueFilter ];
+        return xd;
+    };
+}
+
 let PRESSURE = false;
 let SCALE = 2.5;
 const app = new PIXI.Application({width: 256 * SCALE, height: 384 * SCALE});
@@ -94,7 +106,7 @@ loaderFunc = (loader, resources) => {
     document.getElementById("root").appendChild(app.view);
 
     let ndsFont = {font: '10px NintendoDSBIOS', align: 'center', tint: 0};
-    let ndsFont_name = {font: '10px NintendoDSBIOS', align: 'left', tint: playerData.color};
+    let ndsFont_name = {font: '10px NintendoDSBIOS', align: 'left', tint: darkIt(playerData.color)};
     let ndsFont_jl = {font: '10px NintendoDSBIOS', align: 'left', tint: 0xd3cbc3};
     const pixel = PIXI.Texture.from("images/pixel.png");
     let redraw = false;
@@ -160,61 +172,61 @@ loaderFunc = (loader, resources) => {
         if (e.target !== topyElem) topyElem.onpaste(e);
     };
 
-	//Lets use KeyUp for graphical states
-	let keyUpEv = function (e) {
+    //Lets use KeyUp for graphical states
+    let keyUpEv = function (e) {
         if (e.ctrlKey) return;
         if (!joinedRoom) return;
         const key = e.key.replace("Backspace", "BACKSPACE").replace("Enter", "ENTER");
-		//If the keyboard is not emojis or jap crap
-		if (kbMode < 3) 
-		{
-			//If shift got lifted up, change the graphics
-			if (key === "Shift")
-			{		
-				pc_sprites.shift.alpha = 0;
-				pc_sprites.caps.alpha = 0;
-				kbMode = 0;
-			}
-			//Capslock is currently toggled on
-			if (e.getModifierState && e.getModifierState('CapsLock')) 
-			{
-				pc_sprites.shift.alpha = 0;
-				pc_sprites.caps.alpha = 1;
-				kbMode = 2;
-			} else if(key === "CapsLock") //caplock lifted, and nowtoggled off
-			{
-				pc_sprites.shift.alpha = 0;
-				pc_sprites.caps.alpha = 0;
-				kbMode = 0;
-			}
-		}
-	}
+        //If the keyboard is not emojis or jap crap
+        if (kbMode < 3)
+        {
+            //If shift got lifted up, change the graphics
+            if (key === "Shift")
+            {
+                pc_sprites.shift.alpha = 0;
+                pc_sprites.caps.alpha = 0;
+                kbMode = 0;
+            }
+            //Capslock is currently toggled on
+            if (e.getModifierState && e.getModifierState('CapsLock'))
+            {
+                pc_sprites.shift.alpha = 0;
+                pc_sprites.caps.alpha = 1;
+                kbMode = 2;
+            } else if(key === "CapsLock") //caplock lifted, and nowtoggled off
+            {
+                pc_sprites.shift.alpha = 0;
+                pc_sprites.caps.alpha = 0;
+                kbMode = 0;
+            }
+        }
+    }
 
-	//Keydown is far more reliable than keyup
+    //Keydown is far more reliable than keyup
     let keyDownEv = function (e) {
         if (e.ctrlKey) return;
         if (!joinedRoom) return;
         const key = e.key.replace("Backspace", "BACKSPACE").replace("Enter", "ENTER");
         if (key !== "Shift" && key !== "CapsLock" && (keys_NORMAL.includes(key) || keys_CAPS.includes(key) || keys_SHIFT.includes(key))) addCharacterDirect(key);
-		//If shift is currently helt down, and the keyboard mode is the US character set
-		if (key === "Shift")
-		{		
-			//Update graphics to shift mode
-			if (kbMode < 3) {
-				pc_sprites.shift.alpha = 1;
-				pc_sprites.caps.alpha = 0;
-				kbMode = 1;
-			}
-		}
-		//Enter now sends messages, unless shift is held then its a new line like most chat apps
-		if (key === "ENTER") 
-		{
-			if (!e.shiftKey) 
-			{
-				sendBtn.emit("pointerup");
-			}
-            
-		}else if (key === "ArrowUp") {
+        //If shift is currently helt down, and the keyboard mode is the US character set
+        if (key === "Shift")
+        {
+            //Update graphics to shift mode
+            if (kbMode < 3) {
+                pc_sprites.shift.alpha = 1;
+                pc_sprites.caps.alpha = 0;
+                kbMode = 1;
+            }
+        }
+        //Enter now sends messages, unless shift is held then its a new line like most chat apps
+        if (key === "ENTER")
+        {
+            if (!e.shiftKey)
+            {
+                sendBtn.emit("pointerup");
+            }
+
+        }else if (key === "ArrowUp") {
             sendBtn.emit("pointerup");
         } else if (key === "ArrowDown") {
             renewBtn.emit("pointerup");
@@ -532,7 +544,7 @@ loaderFunc = (loader, resources) => {
         sb.buttonMode = true;
         sb.keyIndex = keyIndex;
         sb.alpha = 0;
-        sb.tint = playerData.color;
+        sb.tint = darkIt(playerData.color);
         sb.draggingState = 0;
         sb.spriteType = "kb";
         sb.on('pointerdown', function () {
@@ -653,7 +665,7 @@ loaderFunc = (loader, resources) => {
                     clearInterval(rainbowTintInterval);
                     rainbowTintInterval = -1;
                 }
-                pc_sprites.drawModeSelect.tint = playerData.color;
+                pc_sprites.drawModeSelect.tint = darkIt(playerData.color);
             }
             switch (act) {
                 case "SEND": {
@@ -735,7 +747,7 @@ loaderFunc = (loader, resources) => {
                         let deg = 0;
                         rainbowTintInterval = setInterval(function () {
                             deg = (deg + 3) % 360;
-                            pc_sprites.drawModeSelect.tint = hsl2rgb2dec(deg, 1, 0.5);
+                            pc_sprites.drawModeSelect.tint = darkIt(hsl2rgb2dec(deg, 1, 0.5));
                         }, 100);
                     }
                     break;
@@ -831,7 +843,7 @@ loaderFunc = (loader, resources) => {
         sb.interactive = true;
         sb.buttonMode = true;
         sb.alpha = 0;
-        sb.tint = playerData.color;
+        sb.tint = darkIt(playerData.color);
         sb.action = action;
         sb.spriteType = "kb";
         sb.on('pointerdown', function () {
@@ -1093,13 +1105,13 @@ loaderFunc = (loader, resources) => {
         container.addChild(box);
         container.addChild(box_lines);
         container.addChild(box_outline);
-        box_outline.tint = message.player.color;
-        box_lines.tint = increase_brightness(message.player.color, 75);
+        box_outline.tint = darkIt(message.player.color);
+        box_lines.tint = darkIt(increase_brightness(message.player.color, 75));
         let height = (189 * SCALE - pc_sprites.scrollContainer.y) / SCALE + 4;
         container.x = 0;
 
 
-        let ndsFont_msg = {font: '10px NintendoDSBIOS', align: 'left', tint: message.player.color};
+        let ndsFont_msg = {font: '10px NintendoDSBIOS', align: 'left', tint: darkIt(message.player.color)};
         let box_name = new PIXI.BitmapText(message.player.name, ndsFont_msg);
         box_name.x = 6;
         box_name.y = 4;
@@ -1160,7 +1172,7 @@ loaderFunc = (loader, resources) => {
                 }
             }
             if (graphics.drawMode === 0xffffff) {
-                graphics.lineStyle(graphics.drawWidth, hsl2rgb2dec(graphics.rainbowDeg, 1, 0.5));
+                graphics.lineStyle(graphics.drawWidth, darkIt(hsl2rgb2dec(graphics.rainbowDeg, 1, 0.5)));
             } else {
                 graphics.lineStyle(graphics.drawWidth + ((graphics.drawMode > 0) * (graphics.drawWidth === 2)), graphics.drawMode);
             }
@@ -1380,28 +1392,28 @@ loaderFunc = (loader, resources) => {
     }
 
     function setupWebSocket() {
-		//Keeps the connection alive
+        //Keeps the connection alive
         function heartbeat() {
             websocket.send("pong");
-			//console.log("Pong sent");
+            //console.log("Pong sent");
         }
 
         websocket.onopen = function (event) {
             console.log("WebSocket connection established.", event);
 
-			//Enable the button!
-			var logo_element = document.getElementById('logo');
-			logo_element.src = 'images/logo.png';
-			logo_element.title = 'Click to join PictoChat Session!';
-			logo_element.onclick = requestVerification;
-			
+            //Enable the button!
+            var logo_element = document.getElementById('logo');
+            logo_element.src = 'images/logo.png';
+            logo_element.title = 'Click to join PictoChat Session!';
+            logo_element.onclick = requestVerification;
+
             //heartbeat();
-			websocket.send("handshake");
+            websocket.send("handshake");
         };
 
         websocket.onmessage = function (event) {
             if (event.data === "ping") {
-				//console.log("Ping received");
+                //console.log("Ping received");
                 heartbeat();
             } else {
                 let oldScrollPos;
@@ -1575,7 +1587,6 @@ loaderFunc = (loader, resources) => {
         }, 1000 / 60);
     }
 
-
     // Set up sprites
     pc_sprites.background = PIXI.Sprite.from("images/background.png");
     pc_sprites.bottom_screen = PIXI.Sprite.from("images/bottom_screen.png");
@@ -1619,7 +1630,7 @@ loaderFunc = (loader, resources) => {
     pc_sprites.choose.y = 192;
     pc_sprites.choose.zIndex = 2;
     pc_sprites.choose_mask.zIndex = 2;
-    pc_sprites.choose_mask.tint = playerData.color;
+    pc_sprites.choose_mask.tint = darkIt(playerData.color);
     pc_sprites.choose.addChild(pc_sprites.choose_mask);
     app.stage.addChild(pc_sprites.choose);
     pc_sprites.scrollContainer.addChild(pc_sprites.opening_message);
@@ -1661,8 +1672,8 @@ loaderFunc = (loader, resources) => {
     pc_sprites.emojis.y = 192;
     pc_sprites.emojis.alpha = 0;
     app.stage.addChild(pc_sprites.emojis);
-    pc_sprites.box_outline.tint = playerData.color;
-    pc_sprites.box_lines.tint = increase_brightness(playerData.color, 75);
+    pc_sprites.box_outline.tint = darkIt(playerData.color);
+    pc_sprites.box_lines.tint = darkIt(increase_brightness(playerData.color, 75));
     pc_sprites.box.x = 21;
     pc_sprites.box.y = 207;
     pc_sprites.box.alpha = 0;
@@ -1708,7 +1719,7 @@ loaderFunc = (loader, resources) => {
     pc_sprites.drawWidthSelect.y = 263;
     pc_sprites.drawWidthSelect.scale.x = 14;
     pc_sprites.drawWidthSelect.scale.y = 14;
-    pc_sprites.drawWidthSelect.tint = playerData.color;
+    pc_sprites.drawWidthSelect.tint = darkIt(playerData.color);
     //pc_sprites.drawWidthSelect.blendMode = PIXI.BLEND_MODES.SCREEN;
     pc_sprites.drawWidthSelect.alpha = 0;
     app.stage.addChild(pc_sprites.drawWidthSelect);
@@ -1718,7 +1729,7 @@ loaderFunc = (loader, resources) => {
     pc_sprites.drawModeSelect.y = 230;
     pc_sprites.drawModeSelect.scale.x = 14;
     pc_sprites.drawModeSelect.scale.y = 13;
-    pc_sprites.drawModeSelect.tint = playerData.color;
+    pc_sprites.drawModeSelect.tint = darkIt(playerData.color);
     //pc_sprites.drawModeSelect.blendMode = PIXI.BLEND_MODES.SCREEN;
     pc_sprites.drawModeSelect.alpha = 0;
     app.stage.addChild(pc_sprites.drawModeSelect);
@@ -1728,7 +1739,7 @@ loaderFunc = (loader, resources) => {
     pc_sprites.keyboardSelect.y = 299;
     pc_sprites.keyboardSelect.scale.x = 14;
     pc_sprites.keyboardSelect.scale.y = 14;
-    pc_sprites.keyboardSelect.tint = playerData.color;
+    pc_sprites.keyboardSelect.tint = darkIt(playerData.color);
     pc_sprites.keyboardSelect.alpha = 0;
     app.stage.addChild(pc_sprites.keyboardSelect);
 
@@ -1864,7 +1875,7 @@ loaderFunc = (loader, resources) => {
                 }
             }
             if (pc_sprites.drawing.drawMode === 0xffffff) {
-                pc_sprites.drawing.lineStyle(pc_sprites.drawing.drawWidth, hsl2rgb2dec(pc_sprites.drawing.rainbowDeg, 1, 0.5));
+                pc_sprites.drawing.lineStyle(pc_sprites.drawing.drawWidth, darkIt(hsl2rgb2dec(pc_sprites.drawing.rainbowDeg, 1, 0.5)));
             } else {
                 pc_sprites.drawing.lineStyle(pc_sprites.drawing.drawWidth + ((pc_sprites.drawing.drawMode > 0) * (pc_sprites.drawing.drawWidth === 2)), pc_sprites.drawing.drawMode);
             }
@@ -1916,38 +1927,27 @@ function scaleStage() {
 
 function updatePlayerData() {
     pc_sprites.box_name.text = playerData.name;
-    pc_sprites.box_name.tint = playerData.color;
-    pc_sprites.box_outline.tint = playerData.color;
-    pc_sprites.box_lines.tint = increase_brightness(playerData.color, 75);
-    pc_sprites.drawWidthSelect.tint = playerData.color;
-    pc_sprites.drawModeSelect.tint = playerData.color;
-    pc_sprites.keyboardSelect.tint = playerData.color;
-    pc_sprites.choose_mask.tint = playerData.color;
+    pc_sprites.box_name.tint = darkIt(playerData.color);
+    pc_sprites.box_outline.tint = darkIt(playerData.color);
+    pc_sprites.box_lines.tint = darkIt(increase_brightness(playerData.color, 75));
+    pc_sprites.drawWidthSelect.tint = darkIt(playerData.color);
+    pc_sprites.drawModeSelect.tint = darkIt(playerData.color);
+    pc_sprites.keyboardSelect.tint = darkIt(playerData.color);
+    pc_sprites.choose_mask.tint = darkIt(playerData.color);
     for (let i = 0; i < app.stage.children.length; i++) {
         if (app.stage.children[i].spriteType === "kb")
-            app.stage.children[i].tint = playerData.color;
+            app.stage.children[i].tint = darkIt(playerData.color);
     }
 }
 
 // https://stackoverflow.com/questions/6443990/javascript-calculate-brighter-colour
-function increase_brightness(hex, percent) {
-    hex = hex.toString(16);
+function increase_brightness(dec, percent) {
+    let r = (dec >> 16) & 0xff,
+        g = (dec >> 8) & 0xff,
+        b = dec & 0xff;
 
-    // convert 3 char codes --> 6, e.g. `E0F` --> `EE00FF`
-    if (hex.length === 3) {
-        hex = hex.replace(/(.)/g, '$1$1');
-    }
-    hex = hex.padStart(6, '0');
-
-    let r = parseInt(hex.substr(0, 2), 16),
-        g = parseInt(hex.substr(2, 2), 16),
-        b = parseInt(hex.substr(4, 2), 16);
-
-    let hexString = '0x' +
-        ((0 | (1 << 8) + r + (256 - r) * percent / 100).toString(16)).substr(1) +
-        ((0 | (1 << 8) + g + (256 - g) * percent / 100).toString(16)).substr(1) +
-        ((0 | (1 << 8) + b + (256 - b) * percent / 100).toString(16)).substr(1);
-    return parseInt(hexString);
+    let f = n => 0 | (1 << 8) + n + (256 - n) * percent / 100;
+    return (f(r) << 16) + (f(g) << 8) + f(b);
 }
 
 function lerp(v0, v1, t) {
@@ -1959,4 +1959,15 @@ function hsl2rgb2dec(h, s, l) {
     let a = s * Math.min(l, 1 - l);
     let f = (n, k = (n + h / 30) % 12) => 255 * (l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1));
     return (f(0) << 16) + (f(8) << 8) + f(4);
+}
+
+function darkIt(dec) {
+    if (darkMode) {
+        const r = (dec >> 16) & 0xff,
+            g = (dec >> 8) & 0xff,
+            b = dec & 0xff;
+        let f = n => 255 - n;
+        dec = (f(r) << 16) + (f(g) << 8) + f(b);
+    }
+    return dec;
 }
