@@ -1946,10 +1946,7 @@ function increase_brightness(dec, percent) {
     const g = (dec >> 8) & 0xff;
     const b = dec & 0xff;
 
-    const f = (ch) => {
-        return Math.min(255, ch + ((255 - ch) * percent / 100));
-    };
-
+    const f = ch => Math.min(255, ch + ((255 - ch) * percent / 100));
     return (f(r) << 16) + (f(g) << 8) + f(b);
 }
 
