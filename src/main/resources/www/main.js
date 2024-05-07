@@ -1942,11 +1942,11 @@ function updatePlayerData() {
 
 // https://stackoverflow.com/questions/6443990/javascript-calculate-brighter-colour
 function increase_brightness(dec, percent) {
-    let r = (dec >> 16) & 0xff,
-        g = (dec >> 8) & 0xff,
-        b = dec & 0xff;
+    const r = (dec >> 16) & 0xff;
+    const g = (dec >> 8) & 0xff;
+    const b = dec & 0xff;
 
-    let f = n => 0 | (1 << 8) + n + (256 - n) * percent / 100;
+    const f = ch => Math.min(255, ch + ((255 - ch) * percent / 100));
     return (f(r) << 16) + (f(g) << 8) + f(b);
 }
 
