@@ -13,7 +13,8 @@
 			"",
 			""
 		],
-		"status_channel": ""
+		"status_channel": "",
+		"image_quality": 4.0
 	},
 	"chat_filter": {
 		"enabled": false,

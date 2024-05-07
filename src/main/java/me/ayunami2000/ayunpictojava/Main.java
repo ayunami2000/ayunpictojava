@@ -68,6 +68,7 @@ public class Main {
 	private static String[] chatFilterAttrs = null;
 	private static String[] chatFilterRooms = null;
 	private static float chatFilterThresh = 0.65f;
+	private static float scale = 4.0F;
 	
 	private static final Set<Channel> connections = new HashSet<>();
 
@@ -330,6 +331,7 @@ public class Main {
 							if (channels.size() > 3) channel4 = channels.get(3).getAsString();
 						}
 					}
+					if (discordJson.has("image_quality")) scale = discordJson.get("image_quality").getAsFloat();
 					try {
 						jda = JDABuilder.createDefault(token).setActivity(Activity.playing("PictoChat Online")).enableIntents(GatewayIntent.GUILD_MESSAGES, GatewayIntent.MESSAGE_CONTENT).addEventListeners(new ListenerAdapter() {
 							@Override
@@ -944,8 +946,8 @@ public class Main {
 		private static final Map<String, Map<JsonObject, ChannelHandlerContext>> ROOM_CODES = new ConcurrentHashMap<>();
 
 		private static Font font = null;
-		private static final BasicStroke stroke1 = new BasicStroke(1);
-		private static final BasicStroke stroke2 = new BasicStroke(2);
+		private static final BasicStroke stroke1 = new BasicStroke(1 * scale, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER);
+		private static final BasicStroke stroke2 = new BasicStroke(2 * scale, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER);
 		private static final BufferedImage box_bg1;
 		private static final BufferedImage box_bg2;
 		private static final BufferedImage box_bg3;
@@ -989,7 +991,7 @@ public class Main {
 			box_outline4 = loadImage("box_outline4");
 			box_outline5 = loadImage("box_outline5");
 			try {
-				font = Font.createFont(Font.TRUETYPE_FONT, Objects.requireNonNull(Main.class.getResourceAsStream("/www/nds.ttf"))).deriveFont(10F);
+				font = Font.createFont(Font.TRUETYPE_FONT, Objects.requireNonNull(Main.class.getResourceAsStream("/www/nds.ttf"))).deriveFont(Font.BOLD, scale * 10F);
 			} catch (FontFormatException | IOException e) {
 				System.err.println("Could not load font!");
 			}
@@ -1676,24 +1678,27 @@ public class Main {
 					default:
 						return null;
 				}
-				BufferedImage drawingImage = biDeepCopy(box_bg);
+				BufferedImage drawingImage = new BufferedImage((int) (box_bg.getWidth() * scale), (int) (box_bg.getHeight() * scale), box_bg.getType());
 				Graphics2D g2d = drawingImage.createGraphics();
+				g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+				g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+				g2d.drawImage(biDeepCopy(box_bg), 0, 0, drawingImage.getWidth(), drawingImage.getHeight(), null);
 				g2d.setBackground(fgColor);
 				Color col = new Color(player.get("color").getAsInt());
 				box_lines = biDeepCopy(box_lines);
 				tint(box_lines, col, 0.75);
-				g2d.drawImage(box_lines, 0, 0, null);
+				g2d.drawImage(box_lines, 0, 0, (int) (box_lines.getWidth() * scale), (int) (box_lines.getHeight() * scale), null);
 				box_outline = biDeepCopy(box_outline);
 				tint(box_outline, col, 1);
-				g2d.drawImage(box_outline, 0, 0, null);
+				g2d.drawImage(box_outline, 0, 0, (int) (box_outline.getWidth() * scale), (int) (box_outline.getHeight() * scale), null);
 				g2d.setColor(col);
 				g2d.setStroke(stroke1);
 				if (font == null) {
-					g2d.setFont(g2d.getFont().deriveFont(12F));
+					g2d.setFont(g2d.getFont().deriveFont(scale * 12F));
 				} else {
 					g2d.setFont(font);
 				}
-				g2d.drawString(player.get("name").getAsString(), 6, 16);
+				g2d.drawString(player.get("name").getAsString(), 6 * scale, 16 * scale);
 				g2d.setColor(fgColor);
 				GeneralPath polyline = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
 				polyline.moveTo(0, 0);
@@ -1727,11 +1732,11 @@ public class Main {
 								rainbowDeg = (rainbowDeg + 12) % 360;
 								g2d.setColor(Color.getHSBColor(rainbowDeg / 360F, 1F, 1F));
 							}
-							polyline.lineTo(x, y);
+							polyline.lineTo(x * scale, y * scale);
 							break;
 						case 1:
 						case 2:
-							polyline.moveTo(x, y);
+							polyline.moveTo(x * scale, y * scale);
 							break;
 						case 3:
 							point = polyline.getCurrentPoint();
@@ -1777,6 +1782,7 @@ public class Main {
 					}
 					if (System.currentTimeMillis() - startTime > 5000) {
 						ctx.close();
+						g2d.dispose();
 						return null;
 					}
 				}
@@ -1785,6 +1791,7 @@ public class Main {
 				g2d.setColor(fgColor);
 				if (System.currentTimeMillis() - startTime > 5000) {
 					ctx.close();
+					g2d.dispose();
 					return null;
 				}
 				for (JsonElement jsonElement : textboxesOut) {
@@ -1796,13 +1803,21 @@ public class Main {
 					String text = textboxObj.get("text").getAsString();
 					double x = textboxObj.get("x").getAsDouble() - 22;
 					double y = textboxObj.get("y").getAsDouble() - 208;
-					g2d.drawString(text, (float) x, (float) y + 12);
+					g2d.drawString(text, (float) x * scale, (float) (y + 12) * scale);
 					if (System.currentTimeMillis() - startTime > 5000) {
 						ctx.close();
+						g2d.dispose();
 						return null;
 					}
 				}
-				return drawingImage;
+				g2d.dispose();
+				BufferedImage drawingImage2 = new BufferedImage((int) (drawingImage.getWidth() / scale), (int) (drawingImage.getHeight() / scale), drawingImage.getType());
+				g2d = drawingImage2.createGraphics();
+				g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+				g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+				g2d.drawImage(drawingImage, 0, 0, drawingImage2.getWidth(), drawingImage2.getHeight(), null);
+				g2d.dispose();
+				return drawingImage2;
 			}
 			return null;
 		}
