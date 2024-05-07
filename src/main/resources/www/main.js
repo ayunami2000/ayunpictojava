@@ -1946,8 +1946,8 @@ function increase_brightness(dec, percent) {
         g = (dec >> 8) & 0xff,
         b = dec & 0xff;
 
-    let f = n => 0 | (1 << 8) + n + (256 - n) * percent / 100;
-    return (f(r) << 16) + (f(g) << 8) + f(b);
+    let f = n => Math.min(255, n + (255 - n) * percent / 100);
+    return Math.floor((f(r) << 16) + (f(g) << 8) + f(b));
 }
 
 function lerp(v0, v1, t) {
