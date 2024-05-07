@@ -991,7 +991,7 @@ public class Main {
 			box_outline4 = loadImage("box_outline4");
 			box_outline5 = loadImage("box_outline5");
 			try {
-				font = Font.createFont(Font.TRUETYPE_FONT, Objects.requireNonNull(Main.class.getResourceAsStream("/www/nds.ttf"))).deriveFont(Font.BOLD, scale * 10F);
+				font = Font.createFont(Font.TRUETYPE_FONT, Objects.requireNonNull(Main.class.getResourceAsStream("/www/nds.ttf"))).deriveFont(scale * 10F);
 			} catch (FontFormatException | IOException e) {
 				System.err.println("Could not load font!");
 			}
