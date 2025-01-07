@@ -2,6 +2,10 @@
 
 Pictochat for the Nintendo DS & DSi, recreated for browsers!
 
+# NOTICE: this project does NOT endorse nor is associated with ANY crypto or NFT projects
+
+don't get scammed kthx
+
 ## In-app commands
 - `!block` / `!ignore` / `!unblock` / `!unignore` - Hide/unhide the messages of someone temporarily.
 - `!tripcode` / `!tc` - When provided with a password, will generate a tripcode and send it as the server. Used for verification that someone is who they say they are.
